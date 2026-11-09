@@ -11,6 +11,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,15 +22,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import de.schnurrfeld.app.BuildConfig
+import de.schnurrfeld.app.data.InstallStatus
 import de.schnurrfeld.app.data.ReleaseInfo
 import de.schnurrfeld.app.data.Updater
 import kotlinx.coroutines.launch
 import java.io.File
 
-private enum class Phase { OFFER, DOWNLOADING, PERMISSION, READY, ERROR }
+private enum class Phase { OFFER, DOWNLOADING, PERMISSION, INSTALLING, ERROR }
 
-/** Offers a new release, downloads it and hands it to the Android installer. */
+/** Offers a new release, downloads it inside the app and installs it through Android's PackageInstaller. */
 @Composable
 fun UpdateDialog(info: ReleaseInfo, onDismiss: () -> Unit) {
     val context = LocalContext.current
@@ -37,14 +43,15 @@ fun UpdateDialog(info: ReleaseInfo, onDismiss: () -> Unit) {
     var progress by remember { mutableFloatStateOf(0f) }
     var apk by remember { mutableStateOf<File?>(null) }
     var error by remember { mutableStateOf("") }
+    val status by Updater.installStatus.collectAsState()
 
     fun installOrAsk(file: File) {
-        if (Updater.canInstall(context)) { phase = Phase.READY; Updater.install(context, file) }
+        if (Updater.canInstall(context)) { phase = Phase.INSTALLING; Updater.install(context, file) }
         else phase = Phase.PERMISSION
     }
 
     fun start() {
-        apk?.let { installOrAsk(it); return }
+        apk?.takeIf { it.exists() }?.let { installOrAsk(it); return }
         phase = Phase.DOWNLOADING; progress = 0f
         scope.launch {
             runCatching { Updater.download(context, info) { progress = it } }
@@ -53,8 +60,19 @@ fun UpdateDialog(info: ReleaseInfo, onDismiss: () -> Unit) {
         }
     }
 
+    // coming back from the "Unbekannte Apps installieren" setting: continue on our own
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val obs = LifecycleEventObserver { _, e ->
+            if (e == Lifecycle.Event.ON_RESUME && phase == Phase.PERMISSION && Updater.canInstall(context)) apk?.let { installOrAsk(it) }
+        }
+        lifecycle.addObserver(obs)
+        onDispose { lifecycle.removeObserver(obs) }
+    }
+
+    val busy = phase == Phase.DOWNLOADING || (phase == Phase.INSTALLING && status == InstallStatus.Working)
     AlertDialog(
-        onDismissRequest = { if (phase != Phase.DOWNLOADING) onDismiss() },
+        onDismissRequest = { if (!busy) { Updater.installStatus.value = null; onDismiss() } },
         title = { Text("Update auf ${info.version}") },
         text = {
             Column {
@@ -83,28 +101,37 @@ fun UpdateDialog(info: ReleaseInfo, onDismiss: () -> Unit) {
                         LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                     }
                     Phase.PERMISSION -> Text(
-                        "Android fragt beim ersten Update einmal nach: Erlaube Schnurrfeld unter \"Unbekannte Apps installieren\", " +
-                            "komm dann zurück und tippe auf \"Installieren\"."
+                        "Android fragt beim ersten Update einmal nach: Tippe auf \"Erlauben\" und schalte " +
+                            "\"Aus dieser Quelle zulassen\" ein. Danach geht es hier von selbst weiter."
                     )
-                    Phase.READY -> Text("Der Android-Installer ist geöffnet. Bestätige dort das Update – dein Fortschritt bleibt erhalten.")
-                    Phase.ERROR -> Text("Das hat leider nicht geklappt: $error")
+                    Phase.INSTALLING -> when (val st = status) {
+                        InstallStatus.Working, null -> {
+                            Text("Wird installiert …")
+                            Gap(12.dp)
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                        }
+                        InstallStatus.Confirm -> Text("Bestätige das Update im Android-Fenster. Schnurrfeld startet danach neu, dein Fortschritt bleibt erhalten.")
+                        InstallStatus.Cancelled -> Text("Das Update wurde abgebrochen. Du kannst es jederzeit erneut starten.")
+                        is InstallStatus.Failed -> Text("Die Installation hat nicht geklappt: ${st.msg}")
+                    }
+                    Phase.ERROR -> Text("Der Download hat nicht geklappt: $error")
                 }
             }
         },
         confirmButton = {
             when (phase) {
                 Phase.OFFER -> TextButton(onClick = ::start) { Text("Jetzt aktualisieren") }
-                Phase.DOWNLOADING -> {}
-                Phase.PERMISSION -> Column {
-                    TextButton(onClick = { Updater.openInstallPermission(context) }) { Text("Erlauben") }
-                    TextButton(onClick = ::start) { Text("Installieren") }
-                }
-                Phase.READY -> TextButton(onClick = ::start) { Text("Nochmal öffnen") }
+                Phase.PERMISSION -> TextButton(onClick = { Updater.openInstallPermission(context) }) { Text("Erlauben") }
+                Phase.INSTALLING -> if (status is InstallStatus.Cancelled || status is InstallStatus.Failed || status == InstallStatus.Confirm)
+                    TextButton(onClick = ::start) { Text(if (status == InstallStatus.Confirm) "Nochmal anzeigen" else "Nochmal versuchen") }
                 Phase.ERROR -> TextButton(onClick = ::start) { Text("Nochmal versuchen") }
+                Phase.DOWNLOADING -> {}
             }
         },
         dismissButton = {
-            if (phase != Phase.DOWNLOADING) TextButton(onClick = onDismiss) { Text(if (phase == Phase.OFFER) "Später" else "Schließen") }
+            if (!busy) TextButton(onClick = { Updater.installStatus.value = null; onDismiss() }) {
+                Text(if (phase == Phase.OFFER) "Später" else "Schließen")
+            }
         },
     )
 }

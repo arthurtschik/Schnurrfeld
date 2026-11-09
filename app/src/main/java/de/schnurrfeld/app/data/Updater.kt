@@ -1,12 +1,15 @@
 package de.schnurrfeld.app.data
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -113,6 +116,7 @@ object Updater {
                 }
             }
         } finally { con.disconnect() }
+        if (total > 0 && file.length() != total) { file.delete(); throw java.io.IOException("Download unvollständig – bitte nochmal versuchen") }
         file
     }
 
@@ -128,12 +132,76 @@ object Updater {
         }
     }
 
-    /** Hands the downloaded APK to the Android package installer. */
+    /** What the system reported about the last installation attempt (null = nothing pending). */
+    val installStatus = MutableStateFlow<InstallStatus?>(null)
+
+    /**
+     * Installs the APK in-app through [PackageInstaller]: the app streams the file into an install session itself,
+     * Android only shows its confirmation. No hand-off to another app, so nothing can get stuck in between.
+     * From the second self-update on (Android 12+) Android may even skip the confirmation.
+     */
     fun install(context: Context, apk: File) {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", apk)
-        context.startActivity(Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
+        installStatus.value = InstallStatus.Working
+        try {
+            val installer = context.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+                setAppPackageName(context.packageName)
+                setSize(apk.length())
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) setPackageSource(PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE)
+            }
+            val id = installer.createSession(params)
+            installer.openSession(id).use { session ->
+                session.openWrite("base.apk", 0, apk.length()).use { out ->
+                    apk.inputStream().use { it.copyTo(out, 64 * 1024) }
+                    session.fsync(out)
+                }
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+                val callback = PendingIntent.getBroadcast(context, id,
+                    Intent(context, InstallReceiver::class.java).setPackage(context.packageName), flags)
+                session.commit(callback.intentSender)
+            }
+        } catch (e: Exception) {
+            installStatus.value = InstallStatus.Failed(e.message ?: e.javaClass.simpleName)
+        }
+    }
+}
+
+sealed class InstallStatus {
+    /** writing the session / waiting for Android */
+    data object Working : InstallStatus()
+    /** Android shows its confirmation */
+    data object Confirm : InstallStatus()
+    data object Cancelled : InstallStatus()
+    data class Failed(val msg: String) : InstallStatus()
+}
+
+/** Receives the result of the install session. */
+class InstallReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                @Suppress("DEPRECATION")
+                val confirm = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                    else intent.getParcelableExtra(Intent.EXTRA_INTENT)
+                if (confirm != null) {
+                    Updater.installStatus.value = InstallStatus.Confirm
+                    context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                } else Updater.installStatus.value = InstallStatus.Failed("Android hat keine Bestätigung angeboten")
+            }
+            PackageInstaller.STATUS_SUCCESS -> Updater.installStatus.value = null   // the app is replaced and restarted by Android
+            PackageInstaller.STATUS_FAILURE_ABORTED -> Updater.installStatus.value = InstallStatus.Cancelled
+            else -> Updater.installStatus.value = InstallStatus.Failed(describe(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)))
+        }
+    }
+
+    private fun describe(status: Int, msg: String?) = when (status) {
+        PackageInstaller.STATUS_FAILURE_CONFLICT -> "Die neue Version passt nicht zur installierten (andere Signatur?)"
+        PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> "Die neue Version läuft auf diesem Gerät nicht"
+        PackageInstaller.STATUS_FAILURE_INVALID -> "Die heruntergeladene Datei ist beschädigt"
+        PackageInstaller.STATUS_FAILURE_STORAGE -> "Nicht genug Speicherplatz"
+        PackageInstaller.STATUS_FAILURE_BLOCKED -> "Android hat die Installation blockiert"
+        else -> msg ?: "Installation fehlgeschlagen ($status)"
     }
 }
