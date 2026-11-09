@@ -1,6 +1,12 @@
 package de.schnurrfeld.app
 
+import android.content.Intent
+import android.content.pm.PackageInstaller
+import androidx.test.core.app.ApplicationProvider
+import de.schnurrfeld.app.data.InstallReceiver
+import de.schnurrfeld.app.data.InstallStatus
 import de.schnurrfeld.app.data.Updater
+import org.robolectric.Shadows.shadowOf
 import de.schnurrfeld.app.ui.components.cleanNotes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,5 +56,33 @@ class UpdaterTest {
         assertEquals("Neu\n• Kratzbaum\n• Mehr Leckerlis", cleanNotes("## Neu\r\n- **Kratzbaum**\r\n* Mehr Leckerlis\r\n"))
         assertEquals("Titel\n\nDatei – Für\nSchnurrfeld-1.3.apk – die App\n\nHinweis: siehe Anleitung",
             cleanNotes("# Titel\n\n---\n\n| Datei | Für |\n|---|:---:|\n| `Schnurrfeld-1.3.apk` | die App |\n\n> **Hinweis:** siehe [Anleitung](https://x.y)"))
+    }
+
+    private val ctx get() = ApplicationProvider.getApplicationContext<android.app.Application>()
+    private fun receive(status: Int, extra: Intent.() -> Unit = {}) =
+        InstallReceiver().onReceive(ctx, Intent().putExtra(PackageInstaller.EXTRA_STATUS, status).apply(extra))
+
+    @Test fun installResults() {
+        val confirm = Intent("android.content.pm.action.CONFIRM_INSTALL")
+        receive(PackageInstaller.STATUS_PENDING_USER_ACTION) { putExtra(Intent.EXTRA_INTENT, confirm) }
+        assertEquals(InstallStatus.Confirm, Updater.installStatus.value)
+        assertEquals("android.content.pm.action.CONFIRM_INSTALL", shadowOf(ctx).nextStartedActivity.action)
+
+        receive(PackageInstaller.STATUS_FAILURE_ABORTED)
+        assertEquals(InstallStatus.Cancelled, Updater.installStatus.value)
+
+        receive(PackageInstaller.STATUS_FAILURE_CONFLICT)
+        assertTrue((Updater.installStatus.value as InstallStatus.Failed).msg.contains("Signatur"))
+
+        receive(PackageInstaller.STATUS_SUCCESS)
+        assertNull(Updater.installStatus.value)
+    }
+
+    @Test fun installOpensASession() {
+        val apk = java.io.File(ctx.cacheDir, "test.apk").apply { writeBytes(ByteArray(4096) { it.toByte() }) }
+        Updater.install(ctx, apk)
+        val sessions = ctx.packageManager.packageInstaller.allSessions
+        assertEquals(1, sessions.size)
+        assertEquals(ctx.packageName, sessions[0].appPackageName)
     }
 }
