@@ -109,10 +109,18 @@ fun UpdateDialog(info: ReleaseInfo, onDismiss: () -> Unit) {
     )
 }
 
-/** GitHub release notes are Markdown – strip the most common markup for plain display. */
-fun cleanNotes(md: String): String = md.lines().joinToString("\n") { line ->
-    line.trimEnd()
-        .replace(Regex("^#{1,6}\\s*"), "")
-        .replace(Regex("^\\s*[-*]\\s+"), "• ")
-        .replace("**", "").replace("__", "").replace("`", "")
-}.replace(Regex("\n{3,}"), "\n\n").trim()
+/** GitHub release notes are Markdown – strip the common markup (rules, tables, links, quotes) for plain display. */
+fun cleanNotes(md: String): String = md.lines().mapNotNull { raw ->
+    val line = raw.trimEnd()
+    when {
+        line.trim().matches(Regex("[-*_]{3,}")) -> ""                                  // --- rule
+        line.trim().matches(Regex("\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?")) -> null  // table separator
+        else -> line
+            .replace(Regex("^>\\s?"), "")
+            .replace(Regex("^#{1,6}\\s*"), "")
+            .replace(Regex("^\\s*[-*]\\s+"), "• ")
+            .let { if (it.trim().startsWith("|")) it.trim().trim('|').split('|').joinToString(" – ") { c -> c.trim() } else it }
+            .replace(Regex("!?\\[([^\\]]*)]\\([^)]*\\)"), "$1")
+            .replace("**", "").replace("__", "").replace("`", "")
+    }
+}.joinToString("\n").replace(Regex("\n{3,}"), "\n\n").trim()

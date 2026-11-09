@@ -48,5 +48,7 @@ class UpdaterTest {
 
     @Test fun notesAreCleaned() {
         assertEquals("Neu\n• Kratzbaum\n• Mehr Leckerlis", cleanNotes("## Neu\r\n- **Kratzbaum**\r\n* Mehr Leckerlis\r\n"))
+        assertEquals("Titel\n\nDatei – Für\nSchnurrfeld-1.3.apk – die App\n\nHinweis: siehe Anleitung",
+            cleanNotes("# Titel\n\n---\n\n| Datei | Für |\n|---|:---:|\n| `Schnurrfeld-1.3.apk` | die App |\n\n> **Hinweis:** siehe [Anleitung](https://x.y)"))
     }
 }
