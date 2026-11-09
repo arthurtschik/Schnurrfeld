@@ -63,5 +63,7 @@ Die App sucht beim Start (abschaltbar) und auf Knopfdruck in den Einstellungen n
 Konvention für ein Release:
 - Tag `v1.3` (oder `1.3`), kein Pre-Release, kein Entwurf
 - APK als Asset anhängen: `Schnurrfeld-1.3.apk`, optional `Schnurrfeld-1.3-Dev.apk` für die Dev-App
-- gleiche Signatur (`app/schnurrfeld.jks`) und höherer `versionCode` als die installierte Version
+- gleiche Signatur (`app/schnurrfeld.jks`, nicht im Repo) und höherer `versionCode` als die installierte Version
 - der Release-Text wird im Update-Dialog als "Neu:" angezeigt
+
+Schritt-für-Schritt-Anleitung: [docs/RELEASE-ANLEITUNG.md](docs/RELEASE-ANLEITUNG.md)
