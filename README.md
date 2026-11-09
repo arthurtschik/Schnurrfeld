@@ -5,7 +5,7 @@ Ein Katzen-Logikrätsel für Android (Kotlin + Jetpack Compose).
 **Regeln:** In jede Zeile, jede Spalte und jeden Farbbereich gehört genau eine Katze. Katzen dürfen sich nicht berühren – auch nicht diagonal.
 
 ## Installieren
-`Schnurrfeld.apk` aufs Handy kopieren, öffnen und „Installation aus unbekannten Quellen“ erlauben (Android 8+).
+Die neueste APK unter [Releases](https://github.com/arthurtschik/Schnurrfeld/releases/latest) herunterladen, öffnen und „Installation aus unbekannten Quellen“ erlauben (Android 8+).
 
 ## Features
 - Fehlende Aufnahme (wird nicht genutzt, solange Finish/Nice job vorhanden sind): `voice_you_did_it.ogg` in `app/src/main/res/raw/` ablegen oder in der App aufnehmen
@@ -57,13 +57,4 @@ Regeln: `NeedRules` in `app/src/main/java/de/schnurrfeld/app/data/Pet.kt`.
 Feldgröße verglichen (schwierigste 20 % bzw. 5 %). Neu erzeugen: `DUMP_LEVELS=1 ./gradlew :app:testPlayDebugUnitTest --tests '*DifficultyReport*'`.
 
 ## Updates
-
-Die App sucht beim Start (abschaltbar) und auf Knopfdruck in den Einstellungen nach dem neuesten GitHub-Release von `arthurtschik/Schnurrfeld`.
-
-Konvention für ein Release:
-- Tag `v1.3` (oder `1.3`), kein Pre-Release, kein Entwurf
-- APK als Asset anhängen: `Schnurrfeld-1.3.apk`, optional `Schnurrfeld-1.3-Dev.apk` für die Dev-App
-- gleiche Signatur (`app/schnurrfeld.jks`, nicht im Repo) und höherer `versionCode` als die installierte Version
-- der Release-Text wird im Update-Dialog als "Neu:" angezeigt
-
-Schritt-für-Schritt-Anleitung: [docs/RELEASE-ANLEITUNG.md](docs/RELEASE-ANLEITUNG.md)
+Die App sucht beim Start und auf Knopfdruck unter Einstellungen › App nach neuen Versionen.
