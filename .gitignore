@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+# signing key – never commit
+*.jks
+*.keystore
+keystore.properties
+# build outputs and previews
+*.apk
+*.zip
+*.mp3
