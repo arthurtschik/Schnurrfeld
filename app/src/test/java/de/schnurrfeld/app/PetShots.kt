@@ -99,7 +99,8 @@ class PetShots {
         // one more item completes stage 1 (8 items, level 5) – the cat should grow right away
         rule.onNodeWithTag("care_FOOD").performClick(); settle(1500); shot("pet_grows_now_after")
     }
-    private fun post(name: String, pose: String, stage: Int = 6, dark: Boolean = false, breed: Breed = Breed.KARAMELL) {
+    private fun post(name: String, pose: String, stage: Int = 6, dark: Boolean = false, breed: Breed = Breed.KARAMELL, hour: Float = 14f) {
+        de.schnurrfeld.app.ui.components.Sky.hourOverride = hour
         val a = app()
         a.store.resetPet()
         val log = if (stage >= 6) "M".repeat(90) else "M".repeat(62)
@@ -116,9 +117,11 @@ class PetShots {
     @Test fun postRoofA() = post("post_roof_a", "roofA")
     @Test fun postRoofB() = post("post_roof_b", "roofB", breed = Breed.MITTERNACHT)
     @Test fun postStep() = post("post_step", "step", breed = Breed.MOPPEL)
-    @Test fun postPeekA() = post("post_peek_a", "peekA", breed = Breed.MOPPEL)
+    @Test fun postHomeA() = post("post_home_a", "homeA", breed = Breed.MOPPEL)
     @Test fun postHomeB() = post("post_home_b", "homeB")
     @Test fun postDoorB() = post("post_door_b", "doorB", breed = Breed.WOLKE)
+    @Test fun postNight() = post("post_night", "roofA", breed = Breed.WOLKE, hour = 23f)
+    @Test fun postDusk() = post("post_dusk", "roofB", breed = Breed.MOPPEL, hour = 19.3f)
     @Test fun postRoofBDark() = post("post_roof_b_dark", "roofB", dark = true, breed = Breed.MITTERNACHT)
     @Test fun postStage5() = post("post_stage5", "scratch", stage = 5, breed = Breed.MOPPEL)
     @Test fun postNews() {
@@ -130,22 +133,50 @@ class PetShots {
         settle(1200); shot("post_news")
     }
 
-    private fun room(name: String, home: Int, pose: String?, dark: Boolean = false, breed: Breed = Breed.KARAMELL, at: Long = 1500) {
+    private fun room(name: String, home: Int, pose: String?, dark: Boolean = false, breed: Breed = Breed.KARAMELL, at: Long = 1500, hour: Float = 14f, fx: Map<String, Long> = emptyMap()) {
+        de.schnurrfeld.app.ui.components.Sky.hourOverride = hour
         val a = app()
         a.store.resetPet()
         a.store.updatePet { it.copy(introSeen = true, stage = 6, seenStage = 6, treeSeen = true, log = "M".repeat(90), breedOverride = breed) }
         a.store.updateProgress { it.copy(unlocked = 80) }
         val sim = de.schnurrfeld.app.ui.screens.PetSim()
         pose?.let { sim.debugPose(it, android.os.SystemClock.uptimeMillis()) }
-        show(dark) { de.schnurrfeld.app.ui.screens.RoomOverlay(a, a.store.pet, sim, home) {} }
+        show(dark) { de.schnurrfeld.app.ui.screens.RoomOverlay(a, a.store.pet, sim, home, fx) {} }
         settle(at); shot(name)
     }
     @Test fun roomLivingEmpty() = room("room_living_empty", 1, null)
     @Test fun roomLivingChair() = room("room_living_chair", 1, "homeA", breed = Breed.MOPPEL)
-    @Test fun roomLivingRug() = room("room_living_rug", 1, "homeA", breed = Breed.MITTERNACHT, at = 15_500)
+    @Test fun roomLivingRug() = room("room_living_rug", 1, "homeA", breed = Breed.MITTERNACHT, at = 15_500, hour = 19.4f)
+    @Test fun roomLivingFire() = room("room_living_fire", 1, "homeA", breed = Breed.WOLKE, at = 15_500, hour = 22f, fx = mapOf("fire" to 900L, "fish" to 800L, "clock" to 900L, "candle" to 2000L))
+    @Test fun roomLivingNight() = room("room_living_night", 1, null, hour = 23f, fx = mapOf("plant" to 400L, "book" to 700L, "rug" to 500L))
     @Test fun roomBedEmpty() = room("room_bed_empty", 2, null)
     @Test fun roomBedSleeping() = room("room_bed_sleep", 2, "homeB", breed = Breed.WOLKE)
-    @Test fun roomLivingDark() = room("room_living_dark", 1, "homeA", dark = true, breed = Breed.MITTERNACHT)
+    @Test fun roomBedNight() = room("room_bed_night", 2, "homeB", breed = Breed.MOPPEL, hour = 23.5f, fx = mapOf("blanket" to 1500L, "pillow" to 500L, "pictures" to 600L))
+    @Test fun roomBedDiffuser() = room("room_bed_diffuser", 2, "homeB", breed = Breed.MITTERNACHT, hour = 21f, fx = mapOf("diffuser" to 3500L, "mug" to 1000L, "window" to 500L))
+    @Test fun roomLivingDark() = room("room_living_dark", 1, "homeA", dark = true, breed = Breed.MITTERNACHT, hour = 21f)
+
+    /** taps into the room like a player would, then waits for the effects to play */
+    private fun tapRoom(name: String, home: Int, taps: List<Pair<Float, Float>>, hour: Float, wait: Long, pose: String? = null) {
+        de.schnurrfeld.app.ui.components.Sky.hourOverride = hour
+        val a = app()
+        a.store.resetPet()
+        a.store.updatePet { it.copy(introSeen = true, stage = 6, seenStage = 6, treeSeen = true, log = "M".repeat(90), breedOverride = Breed.MOPPEL) }
+        a.store.updateProgress { it.copy(unlocked = 80) }
+        val sim = de.schnurrfeld.app.ui.screens.PetSim()
+        pose?.let { sim.debugPose(it, android.os.SystemClock.uptimeMillis()) }
+        show { de.schnurrfeld.app.ui.screens.RoomOverlay(a, a.store.pet, sim, home) {} }
+        settle(300)
+        for ((fx, fy) in taps) {
+            rule.onNodeWithTag("roomCanvas").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * fx, height * fy)) }
+            settle(60)
+        }
+        settle(wait); shot(name)
+    }
+    // living room: fire, fish picture, clock, candle, plant, window, lamp (off), chair, bookshelf, rug, floor plant, cat
+    @Test fun tapLivingRoom() = tapRoom("tap_living", 1, listOf(0.43f to 0.25f, 0.43f to 0.17f, 0.685f to 0.115f, 0.33f to 0.24f, 0.53f to 0.25f, 0.685f to 0.3f, 0.885f to 0.5f, 0.64f to 0.8f, 0.1f to 0.4f, 0.3f to 0.9f, 0.07f to 0.7f), 21f, 700, pose = "homeA")
+    @Test fun tapFire() = tapRoom("tap_fire", 1, listOf(0.43f to 0.5f), 20f, 800, pose = "homeA")
+    @Test fun tapBedroom() = tapRoom("tap_bed", 2, listOf(0.4f to 0.6f, 0.693f to 0.5f, 0.65f to 0.48f, 0.69f to 0.26f, 0.25f to 0.15f, 0.15f to 0.5f, 0.735f to 0.51f, 0.87f to 0.5f, 0.17f to 0.84f, 0.5f to 0.9f, 0.93f to 0.7f), 23f, 900, pose = "homeB")
+    @Test fun tapDiffuser() = tapRoom("tap_diffuser", 2, listOf(0.693f to 0.5f), 22f, 3500, pose = "homeB")
 
     @Test fun stage4Dark() = basket("pet_stage4_wolke_dark", 4, "B".repeat(45), dark = true)
     @Test fun breeds() {
