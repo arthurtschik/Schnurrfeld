@@ -11,7 +11,7 @@ Bitte nicht öffentlich als Issue beschreiben. Nutze stattdessen im Reiter **Sec
 Alle Versionen sind mit demselben Schlüssel signiert. Den Fingerabdruck kannst du mit dem Android-Tool `apksigner` prüfen:
 
 ```bash
-apksigner verify --print-certs Schnurrfeld-1.3.apk
+apksigner verify --print-certs Schnurrfeld-1.4.apk
 ```
 
 Erwartet wird dieser SHA-256-Fingerabdruck des Zertifikats:

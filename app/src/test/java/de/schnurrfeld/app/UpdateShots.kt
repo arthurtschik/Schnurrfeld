@@ -9,6 +9,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import de.schnurrfeld.app.audio.SoundManager
@@ -49,5 +51,18 @@ class UpdateShots {
         rule.onNodeWithText("Fortschritt zurücksetzen").performScrollTo()
         rule.waitForIdle()
         rule.onRoot().captureRoboImage("$out/update_settings.png")
+    }
+
+    @Test fun changelog() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val app = App(Store(ctx), SoundManager(ctx), VoiceManager(ctx), LevelBank { File("src/main/assets/levels.txt").inputStream() })
+        rule.setContent { SchnurrTheme(false) { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { SettingsScreen(app, {}, {}) } } }
+        rule.onNodeWithTag("changelog_1.2.2").performScrollTo()
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/changelog_a.png")
+        rule.onNodeWithTag("changelog_1.2.2").performClick()
+        rule.onNodeWithTag("changelog_1.4").performScrollTo()
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/changelog_b.png")
     }
 }

@@ -64,6 +64,7 @@ import androidx.compose.ui.window.Dialog
 import de.schnurrfeld.app.App
 import de.schnurrfeld.app.audio.Haptic
 import de.schnurrfeld.app.audio.Sfx
+import de.schnurrfeld.app.audio.MEOW_VOLUME
 import de.schnurrfeld.app.audio.meowFor
 import de.schnurrfeld.app.audio.meowRate
 import de.schnurrfeld.app.data.Breed
@@ -652,7 +653,7 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier, onRoom
                 while (sim.sounds.isNotEmpty()) {
                     val sfx = sim.sounds.removeAt(0)
                     if (!settings.sound) continue
-                    if (sfx.isMeow) app.sound.play(sfx, 0.28f, meowRate(sfx, sim.stage)) else app.sound.play(sfx, 0.8f)
+                    if (sfx.isMeow) app.sound.play(sfx, MEOW_VOLUME, meowRate(sfx, sim.stage)) else app.sound.play(sfx, 0.8f)
                 }
                 if (sim.wantsPurr && purr == 0 && settings.sound) purr = app.sound.loop(Sfx.PURR, if (stage < PetRules.HATCH_STAGE) 0.5f else 0.85f)
                 if (!sim.wantsPurr && purr != 0) { app.sound.stop(purr); purr = 0 }

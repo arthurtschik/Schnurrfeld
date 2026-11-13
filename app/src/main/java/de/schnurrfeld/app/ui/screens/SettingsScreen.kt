@@ -1,5 +1,6 @@
 package de.schnurrfeld.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Contrast
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
@@ -41,9 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import de.schnurrfeld.app.App
 import de.schnurrfeld.app.BuildConfig
+import de.schnurrfeld.app.data.Changelog
 import de.schnurrfeld.app.data.Updater
 import kotlinx.coroutines.launch
 import de.schnurrfeld.app.data.ThemeMode
@@ -114,6 +119,8 @@ fun SettingsScreen(app: App, onBack: () -> Unit, onVoice: () -> Unit) {
                 NavRow(Icons.Rounded.Mic, "Eigene Lob-Stimme", "Mitgelieferte Stimme ersetzen: aufnehmen oder importieren", onVoice)
             }
 
+            ChangelogSection()
+
             SectionTitle("App")
             SectionCard {
                 SwitchRow(Icons.Rounded.SystemUpdate, "Updates automatisch suchen", "Beim Start auf GitHub nachsehen. GitHub sieht dabei deine IP-Adresse, sonst wird nichts gesendet.", s.autoUpdate) {
@@ -165,6 +172,45 @@ fun SettingsScreen(app: App, onBack: () -> Unit, onVoice: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Abbrechen") } }
         )
+    }
+}
+
+/** "Was ist neu": every version with its changes, the newest one open */
+@Composable
+private fun ChangelogSection() {
+    var open by remember { mutableStateOf(setOf(Changelog.entries.first().version)) }
+    SectionTitle("Was ist neu")
+    SectionCard {
+        Changelog.entries.forEachIndexed { i, e ->
+            if (i > 0) Divider()
+            val expanded = e.version in open
+            Column(
+                Modifier.fillMaxWidth().clickable { open = if (expanded) open - e.version else open + e.version }
+                    .padding(horizontal = 16.dp, vertical = 12.dp).testTag("changelog_${e.version}")
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Version ${e.version}" + if (e.version == BuildConfig.VERSION_NAME.removeSuffix("-dev")) "  ·  installiert" else "",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(e.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                AnimatedVisibility(expanded) {
+                    Column(Modifier.padding(top = 8.dp)) {
+                        for (sec in e.sections) {
+                            Text(sec.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+                            for (item in sec.items) Row(Modifier.padding(vertical = 2.dp)) {
+                                Text("•", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 8.dp))
+                                Text(item, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import de.schnurrfeld.app.App
 import de.schnurrfeld.app.audio.Sfx
+import de.schnurrfeld.app.audio.MEOW_VOLUME
 import de.schnurrfeld.app.audio.meowFor
 import de.schnurrfeld.app.audio.meowRate
 import de.schnurrfeld.app.data.Breed
@@ -106,7 +107,7 @@ fun RoomOverlay(app: App, pet: Pet, sim: PetSim, home: Int, startFx: Map<String,
             "diffuser" -> app.sound.play(Sfx.SUCCESS_3, 0.35f, 1.2f)
             "toy" -> if (home == 1) app.sound.play(Sfx.PLOP, 0.7f, 1.9f) else app.sound.play(Sfx.COIN, 0.5f, 1.3f)
             "blanket" -> app.sound.play(Sfx.CRANK, 0.4f, 1.3f)
-            "cat" -> { val m = meowFor(6, false); app.sound.play(m, 0.28f, meowRate(m, 6)) }
+            "cat" -> { val m = meowFor(6, false); app.sound.play(m, MEOW_VOLUME, meowRate(m, 6)) }
             else -> app.sound.play(Sfx.TAP, 0.6f, 0.9f + noise(taps.intValue) * 0.3f)
         }
     }

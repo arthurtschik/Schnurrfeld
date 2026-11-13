@@ -43,7 +43,7 @@ Sounds werden synthetisch erzeugt (`app/src/main/res/raw/*.wav`) und lassen sich
 
 ## Katzenkörbchen (ab 1.2)
 Ein Bündel im Körbchen, das man mit Leckerli, Katzenmilch, Streichelbürste und Wollknäuel großzieht.
-Ab der Teenie-Stufe (Stufe 5) wird das Körbchen zu klein: Ein großer Kratzbaum zieht ein (ab 1.3), mit zwei Wohnhöhlen in Katzengröße,
+Ab der Teenie-Stufe (Stufe 5) wird das Körbchen zu klein: Ein großer Kratzbaum zieht ein (ab 1.4), mit zwei Wohnhöhlen in Katzengröße,
 Kissen auf den Dächern und einer niedrigen Stufe. Die Katze kratzt, klettert, schläft oben oder verschwindet in einer Höhle; von außen sieht man eine Vorschau auf das Zimmer dahinter.
 Ein Tipp auf eine Höhle öffnet das Zimmer: ein Wohnzimmer mit Kamin, Schaukelstuhl und Fischbild, ein Schlafzimmer mit Bett, Duftspender und Nachtfenster.
 Die Zimmer sind in Perspektive gezeichnet, die Fenster zeigen die echte Tageszeit (Sonne, Dämmerung, Mond und Sterne) mit kleinen Ereignissen (Vögel, Schmetterling, Glühwürmchen, Eule, Sternschnuppe).

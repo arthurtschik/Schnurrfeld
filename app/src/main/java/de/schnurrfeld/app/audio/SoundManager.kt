@@ -26,6 +26,9 @@ enum class Sfx(val res: Int) {
     val isMeow get() = name.startsWith("MEOW_")
 }
 
+/** how loud the cat meows: the recordings are much louder than the synthetic sounds, so this is turned down a lot */
+const val MEOW_VOLUME = 0.14f
+
 /**
  * A meow that fits the cat's age: small cats squeak, grown ones sound deeper.
  * [long] is the drawn-out call used when the cat misses you or is overjoyed.
