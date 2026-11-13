@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Gradle dependencies and the Gradle wrapper: weekly pull requests for new (security) versions
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

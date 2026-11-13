@@ -56,6 +56,9 @@ enum class Praise(val text: String, val resName: String, val tier: Int, val kind
     }
 }
 
+/** upper limit for imported voice files */
+private const val MAX_IMPORT_BYTES = 10L * 1024 * 1024
+
 class VoiceManager(private val context: Context) {
     private val dir = File(context.filesDir, "voice").apply { mkdirs() }
     private var tts: TextToSpeech? = null
@@ -156,13 +159,31 @@ class VoiceManager(private val context: Context) {
         revision.intValue++
     }
 
-    fun import(p: Praise, uri: Uri): Boolean = runCatching {
-        context.contentResolver.openInputStream(uri)!!.use { input ->
-            fileFor(p).outputStream().use { input.copyTo(it) }
-        }
-        revision.intValue++
-        true
-    }.getOrDefault(false)
+    /** Copies a picked audio file into the app. Capped (a spoken word is a few seconds) and written atomically. */
+    fun import(p: Praise, uri: Uri): Boolean {
+        val tmp = File(dir, "${p.name.lowercase()}.tmp")
+        return runCatching {
+            var size = 0L
+            context.contentResolver.openInputStream(uri)!!.use { input ->
+                tmp.outputStream().use { out ->
+                    val buf = ByteArray(32 * 1024)
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        size += n
+                        require(size <= MAX_IMPORT_BYTES) { "file too large" }
+                        out.write(buf, 0, n)
+                    }
+                }
+            }
+            require(size > 0) { "empty file" }
+            val target = fileFor(p)
+            target.delete()
+            require(tmp.renameTo(target)) { "rename failed" }
+            revision.intValue++
+            true
+        }.getOrElse { tmp.delete(); false }
+    }
 
     fun delete(p: Praise) {
         fileFor(p).delete()

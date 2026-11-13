@@ -20,8 +20,8 @@ android {
         applicationId = "de.schnurrfeld.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.2"
+        versionCode = 14
+        versionName = "1.2.2"
     }
 
     // "play" = the normal app, "dev" = a separate app (own data, own icon) with a developer menu
@@ -45,6 +45,8 @@ android {
             storePassword = keystoreProps.getProperty("storePassword")
             keyAlias = keystoreProps.getProperty("keyAlias")
             keyPassword = keystoreProps.getProperty("keyPassword")
+            enableV2Signing = true
+            enableV3Signing = true   // lets the key be rotated later without locking users out
         }
     }
 

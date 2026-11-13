@@ -116,7 +116,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit, onVoice: () -> Unit) {
 
             SectionTitle("App")
             SectionCard {
-                SwitchRow(Icons.Rounded.SystemUpdate, "Updates automatisch suchen", "Beim Start auf GitHub nachsehen", s.autoUpdate) {
+                SwitchRow(Icons.Rounded.SystemUpdate, "Updates automatisch suchen", "Beim Start auf GitHub nachsehen. GitHub sieht dabei deine IP-Adresse, sonst wird nichts gesendet.", s.autoUpdate) {
                     update { st -> st.copy(autoUpdate = it) }
                 }
                 Divider()
