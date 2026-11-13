@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: no voice recordings in the cloud backup (phone-to-phone transfer is fine). -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="voice/" />
+    </cloud-backup>
+</data-extraction-rules>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 6-11: the progress may be backed up, the user's own voice recordings must not leave the phone. -->
+<full-backup-content>
+    <exclude domain="file" path="voice/" />
+</full-backup-content>

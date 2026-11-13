@@ -58,3 +58,10 @@ Feldgröße verglichen (schwierigste 20 % bzw. 5 %). Neu erzeugen: `DUMP_LEVELS=
 
 ## Updates
 Die App sucht beim Start und auf Knopfdruck unter Einstellungen › App nach neuen Versionen.
+
+## Datenschutz
+- Keine Konten, keine Werbung, kein Tracking, keine Analyse-Dienste. Der Spielstand liegt nur auf dem Gerät.
+- Das Mikrofon wird nur benutzt, wenn du selbst ein Lob-Wort aufnimmst. Aufnahmen bleiben auf dem Gerät und sind vom Android-Cloud-Backup ausgenommen.
+- Die einzige Netzwerkverbindung ist die Update-Suche bei GitHub (abschaltbar unter Einstellungen › App). Dabei sieht GitHub wie bei jedem Webseitenaufruf deine IP-Adresse.
+
+Mehr zur Sicherheit: [SECURITY.md](SECURITY.md)

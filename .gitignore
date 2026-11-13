@@ -13,3 +13,6 @@ keystore.properties
 *.apk
 *.zip
 *.mp3
+
+# release artefacts (kept out of git)
+release/

@@ -46,6 +46,7 @@ fun UpdateDialog(info: ReleaseInfo, onDismiss: () -> Unit) {
     val status by Updater.installStatus.collectAsState()
 
     fun installOrAsk(file: File) {
+        Updater.verify(context, file)?.let { msg -> file.delete(); apk = null; error = msg; phase = Phase.ERROR; return }
         if (Updater.canInstall(context)) { phase = Phase.INSTALLING; Updater.install(context, file) }
         else phase = Phase.PERMISSION
     }
@@ -114,7 +115,7 @@ fun UpdateDialog(info: ReleaseInfo, onDismiss: () -> Unit) {
                         InstallStatus.Cancelled -> Text("Das Update wurde abgebrochen. Du kannst es jederzeit erneut starten.")
                         is InstallStatus.Failed -> Text("Die Installation hat nicht geklappt: ${st.msg}")
                     }
-                    Phase.ERROR -> Text("Der Download hat nicht geklappt: $error")
+                    Phase.ERROR -> Text("Das Update ist nicht möglich: $error")
                 }
             }
         },

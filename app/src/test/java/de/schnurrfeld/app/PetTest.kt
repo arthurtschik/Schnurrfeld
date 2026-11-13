@@ -158,4 +158,12 @@ class PetTest {
         assertEquals(1, Solver(4, p.regions).countSolutions(2))
         assertEquals(1, de.schnurrfeld.app.game.LogicRater.rate(p))
     }
+
+    @Test fun corruptCareLogIsCleanedInsteadOfCrashing() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        ctx.getSharedPreferences("schnurrfeld", android.content.Context.MODE_PRIVATE).edit().putString("pet_log", "FFxMM??B\u0000Y").commit()
+        val pet = Store(ctx).pet
+        assertEquals("FFMMBY", pet.log)
+        PetRules.breedFor(pet.log)   // must not throw
+    }
 }

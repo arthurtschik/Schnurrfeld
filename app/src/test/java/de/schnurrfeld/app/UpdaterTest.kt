@@ -20,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
 class UpdaterTest {
     private fun release(tag: String, vararg assets: String, pre: Boolean = false) = """
         {"tag_name":"$tag","name":"Schnurrfeld $tag","draft":false,"prerelease":$pre,"body":"## Neu\r\n- Kratzbaum",
-         "assets":[${assets.joinToString(",") { """{"name":"$it","size":1234,"browser_download_url":"https://github.com/x/$it"}""" }}]}
+         "assets":[${assets.joinToString(",") { """{"name":"$it","size":1234,"browser_download_url":"https://github.com/arthurtschik/Schnurrfeld/releases/download/$tag/$it"}""" }}]}
     """.trimIndent()
 
     @Test fun versions() {
@@ -40,11 +40,12 @@ class UpdaterTest {
         val play = Updater.parseRelease(json, dev = false)!!
         assertEquals("1.3", play.version)
         assertEquals("Schnurrfeld-1.3.apk", play.apkName)
-        assertEquals("https://github.com/x/Schnurrfeld-1.3.apk", play.apkUrl)
+        assertEquals("https://github.com/arthurtschik/Schnurrfeld/releases/download/v1.3/Schnurrfeld-1.3.apk", play.apkUrl)
         assertEquals(1234L, play.size)
         assertEquals("Schnurrfeld-1.3-Dev.apk", Updater.parseRelease(json, dev = true)!!.apkName)
-        // only one APK attached: both apps take it
-        assertEquals("Schnurrfeld-1.3.apk", Updater.parseRelease(release("1.3", "Schnurrfeld-1.3.apk"), dev = true)!!.apkName)
+        // the apps never take each other's APK (different package names)
+        assertNull(Updater.parseRelease(release("1.3", "Schnurrfeld-1.3.apk"), dev = true))
+        assertNull(Updater.parseRelease(release("1.3", "Schnurrfeld-1.3-Dev.apk"), dev = false))
     }
 
     @Test fun ignoresUnusableReleases() {
@@ -56,6 +57,36 @@ class UpdaterTest {
         assertEquals("Neu\n• Kratzbaum\n• Mehr Leckerlis", cleanNotes("## Neu\r\n- **Kratzbaum**\r\n* Mehr Leckerlis\r\n"))
         assertEquals("Titel\n\nDatei – Für\nSchnurrfeld-1.3.apk – die App\n\nHinweis: siehe Anleitung",
             cleanNotes("# Titel\n\n---\n\n| Datei | Für |\n|---|:---:|\n| `Schnurrfeld-1.3.apk` | die App |\n\n> **Hinweis:** siehe [Anleitung](https://x.y)"))
+    }
+
+    @Test fun onlyGithubOverHttps() {
+        assertTrue(Updater.isTrustedHost("https://github.com/arthurtschik/Schnurrfeld/releases/download/v1.3/a.apk"))
+        assertTrue(Updater.isTrustedHost("https://objects.githubusercontent.com/github-production-release-asset/1?x=y"))
+        assertTrue(Updater.isTrustedHost("https://release-assets.githubusercontent.com/a"))
+        assertFalse(Updater.isTrustedHost("http://github.com/a.apk"))                        // no plain http
+        assertFalse(Updater.isTrustedHost("https://evilgithub.com/a.apk"))                   // look-alike
+        assertFalse(Updater.isTrustedHost("https://github.com.evil.example/a.apk"))
+        assertFalse(Updater.isTrustedHost("https://github.com@evil.example/a.apk"))          // credentials trick
+        assertFalse(Updater.isTrustedHost("https://github.com:8443/a.apk"))
+        assertFalse(Updater.isTrustedHost("file:///sdcard/a.apk"))
+        assertFalse(Updater.isTrustedHost("not a url"))
+    }
+
+    @Test fun assetMustBeFromThisRepository() {
+        assertTrue(Updater.isTrustedAsset("https://github.com/arthurtschik/Schnurrfeld/releases/download/v1.3/Schnurrfeld-1.3.apk"))
+        assertFalse(Updater.isTrustedAsset("https://github.com/someone-else/Schnurrfeld/releases/download/v1.3/Schnurrfeld-1.3.apk"))
+        assertFalse(Updater.isTrustedAsset("https://github.com/arthurtschik/Schnurrfeld-fake/releases/download/v1.3/a.apk"))
+        // a release whose asset points elsewhere is ignored
+        val evil = """{"tag_name":"v9.9","assets":[{"name":"Schnurrfeld-9.9.apk","size":1,"browser_download_url":"https://evil.example/Schnurrfeld-9.9.apk"}]}"""
+        assertNull(Updater.parseRelease(evil, dev = false))
+        // odd asset names do no harm: the file is always saved as update.apk
+        val odd = """{"tag_name":"v1.3","assets":[{"name":"../../x.apk","size":1,"browser_download_url":"https://github.com/arthurtschik/Schnurrfeld/releases/download/v1.3/x.apk"}]}"""
+        assertEquals("v1.3".removePrefix("v"), Updater.parseRelease(odd, dev = false)!!.version)
+    }
+
+    @Test fun garbageFileIsRejected() {
+        val f = java.io.File(ApplicationProvider.getApplicationContext<android.app.Application>().cacheDir, "garbage.apk").apply { writeText("not an apk") }
+        assertEquals("Die Datei ist keine gültige App", Updater.verify(ApplicationProvider.getApplicationContext(), f))
     }
 
     private val ctx get() = ApplicationProvider.getApplicationContext<android.app.Application>()

@@ -163,7 +163,7 @@ class Store(context: Context) {
             val parts = it.split(":")
             if (parts.size == 2 && parts[0].length == 1) runCatching { Care.of(parts[0][0]) to parts[1].toInt() }.getOrNull() else null
         }.toMap(),
-        log = sp.getString("pet_log", "").orEmpty(),
+        log = sp.getString("pet_log", "").orEmpty().filter { c -> Care.entries.any { it.code == c } },
         stage = sp.getInt("pet_stage", 0),
         seenStage = sp.getInt("pet_seen", 0),
         breedOverride = sp.getString("pet_breed", "").orEmpty().let { n -> Breed.entries.firstOrNull { it.name == n } },
