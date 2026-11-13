@@ -56,6 +56,14 @@ class App(val store: Store, val sound: SoundManager, val voice: VoiceManager, va
     var update by mutableStateOf<de.schnurrfeld.app.data.ReleaseInfo?>(null)
     /** the automatic check runs once per app start */
     var autoChecked = false
+    /** a game that was running when the app was closed or cleared from memory: it is continued once */
+    var resume: de.schnurrfeld.app.game.GameSnapshot? = null
+    fun takeResume(mode: GameMode): de.schnurrfeld.app.game.GameSnapshot? {
+        val r = resume ?: return null
+        if (r.mode() != mode) return null
+        resume = null
+        return r
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -65,6 +73,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         app = App(Store(this), SoundManager(this), VoiceManager(this), LevelBank(openTags = { runCatching { assets.open("level_tags.txt") }.getOrNull() }, open = { runCatching { assets.open("levels.txt") }.getOrNull() }))
         app.voice.warmUp(app.store.settings.voice && app.store.settings.ttsFallback)
+        app.resume = de.schnurrfeld.app.game.GameSnapshot.decode(app.store.savedGame)?.takeIf {
+            app.store.settings.tutorialDone && it.mode() != null && System.currentTimeMillis() - it.savedAt < de.schnurrfeld.app.game.GameSnapshot.MAX_AGE_MS
+        }
 
         setContent {
             val s = app.store.settings
@@ -94,9 +105,15 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AppNav(app: App) {
-    var screen by remember { mutableStateOf(if (app.store.settings.tutorialDone) Screen.Menu else Screen.Tutorial) }
+    var screen by remember {
+        mutableStateOf<Screen>(
+            if (!app.store.settings.tutorialDone) Screen.Tutorial
+            else app.resume?.mode()?.let { m -> Screen.Game(m, if (m is GameMode.Level) Screen.Levels else Screen.Menu) } ?: Screen.Menu
+        )
+    }
     val back: () -> Unit = {
         if (screen == Screen.Tutorial) app.store.updateSettings { it.copy(tutorialDone = true) }
+        if (screen is Screen.Game) app.store.saveGame(null)      // left on purpose: nothing to resume
         screen = when (val s = screen) {
             is Screen.Game -> s.from
             Screen.Voice -> Screen.Settings

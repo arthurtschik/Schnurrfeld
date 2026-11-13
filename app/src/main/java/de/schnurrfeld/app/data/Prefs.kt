@@ -140,6 +140,7 @@ class Store(context: Context) {
             .putString("pet_needs", p.needs.encode())
             .putLong("pet_needs_at", p.needsAt)
             .putLong("pet_last_visit", p.lastVisit)
+            .putBoolean("pet_tree_seen", p.treeSeen)
             .apply()
     }
 
@@ -170,6 +171,7 @@ class Store(context: Context) {
         needs = Needs.decode(sp.getString("pet_needs", null)) ?: Needs(),
         needsAt = sp.getLong("pet_needs_at", 0L),
         lastVisit = sp.getLong("pet_last_visit", 0L),
+        treeSeen = sp.getBoolean("pet_tree_seen", false),
     )
 
     // ---------- Katzenkörbchen actions ----------
@@ -242,6 +244,10 @@ class Store(context: Context) {
             .putBoolean("autoUpdate", s.autoUpdate)
             .apply()
     }
+
+    /** the running game (see GameSnapshot), null when nothing is to be resumed */
+    val savedGame: String? get() = sp.getString("saved_game", null)
+    fun saveGame(line: String?) { sp.edit().apply { if (line == null) remove("saved_game") else putString("saved_game", line) }.apply() }
 
     fun updateProgress(f: (Progress) -> Progress) {
         progress = f(progress)

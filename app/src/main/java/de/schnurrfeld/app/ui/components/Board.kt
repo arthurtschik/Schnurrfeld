@@ -343,7 +343,7 @@ private fun DrawScope.drawOverlay(p: Puzzle, ctrl: GameController, now: Long, da
     }
 
     val won = ctrl.status == Status.WON
-    val anims = CatAnim.entries
+    val anims = BoardAnims
     for (cell in 0 until n * n) {
         if (ctrl.cells.getOrNull(cell) != Cell.CAT) continue
         val placed = ctrl.placedAt[cell] ?: 0L

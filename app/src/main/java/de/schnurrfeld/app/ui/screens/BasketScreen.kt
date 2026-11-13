@@ -12,6 +12,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +63,8 @@ import androidx.compose.ui.window.Dialog
 import de.schnurrfeld.app.App
 import de.schnurrfeld.app.audio.Haptic
 import de.schnurrfeld.app.audio.Sfx
+import de.schnurrfeld.app.audio.meowFor
+import de.schnurrfeld.app.audio.meowRate
 import de.schnurrfeld.app.data.Breed
 import de.schnurrfeld.app.data.Care
 import de.schnurrfeld.app.data.Pet
@@ -77,6 +80,10 @@ import de.schnurrfeld.app.ui.components.MachineIcon
 import de.schnurrfeld.app.ui.components.TalerIcon
 import de.schnurrfeld.app.ui.components.TopBar
 import de.schnurrfeld.app.ui.components.drawBedBack
+import de.schnurrfeld.app.ui.components.Spot
+import de.schnurrfeld.app.ui.components.Tree
+import de.schnurrfeld.app.ui.components.drawClimbingTree
+import de.schnurrfeld.app.ui.components.drawTailPeek
 import de.schnurrfeld.app.ui.components.drawBedBlanket
 import de.schnurrfeld.app.ui.components.drawBedFront
 import de.schnurrfeld.app.ui.components.drawTailOverRim
@@ -107,14 +114,16 @@ import kotlin.random.Random
 // ======================================================================= screen
 
 @Composable
-fun BasketScreen(app: App, onBack: () -> Unit) {
+fun BasketScreen(app: App, sim: PetSim = remember { PetSim() }, onBack: () -> Unit) {
     val store = app.store
     val pet = store.pet
-    val sim = remember { PetSim() }
     var showMachine by remember { mutableStateOf(false) }
     var showShop by remember { mutableStateOf<Care?>(null) }
     var shopOpen by remember { mutableStateOf(false) }
     var reveal by remember { mutableStateOf<Int?>(null) }
+    var treeNote by remember { mutableStateOf(false) }
+    /** the cave whose room is open (1 / 2), 0 = none */
+    var room by remember { mutableStateOf(0) }
     val settings = store.settings
     fun sfx(s: Sfx, v: Float = 1f, r: Float = 1f) { if (settings.sound) app.sound.play(s, v, r) }
 
@@ -131,8 +140,12 @@ fun BasketScreen(app: App, onBack: () -> Unit) {
     LaunchedEffect(pet.stage, pet.introSeen) {
         if (pet.introSeen && pet.seenStage < pet.stage) {
             if (pet.stage >= PetRules.HATCH_STAGE && pet.seenStage < PetRules.HATCH_STAGE) sim.startHatch()
+            treeNote = pet.stage >= PetRules.KRATZ_STAGE && !pet.treeSeen
             reveal = pet.stage
-            store.updatePet { it.copy(seenStage = it.stage) }
+            store.updatePet { it.copy(seenStage = it.stage, treeSeen = it.treeSeen || it.stage >= PetRules.KRATZ_STAGE) }
+        } else if (pet.introSeen && pet.stage >= PetRules.KRATZ_STAGE && !pet.treeSeen) {
+            reveal = TREE_NEWS
+            store.updatePet { it.copy(treeSeen = true) }
         }
     }
 
@@ -159,7 +172,7 @@ fun BasketScreen(app: App, onBack: () -> Unit) {
             }
 
             if (pet.stage >= PetRules.HATCH_STAGE) NeedsRow(app, sim)
-            PetScene(app, pet, sim, Modifier.weight(1f).fillMaxWidth())
+            PetScene(app, pet, sim, Modifier.weight(1f).fillMaxWidth(), onRoom = { room = it })
 
             ProgressPanel(pet, store.levelReached)
 
@@ -198,8 +211,9 @@ fun BasketScreen(app: App, onBack: () -> Unit) {
         }
 
         reveal?.let { st ->
-            RevealCard(st, pet.breed, Modifier.align(Alignment.Center)) { reveal = null }
+            RevealCard(st, pet.breed, treeNote, Modifier.align(Alignment.Center)) { reveal = null }
         }
+        if (room != 0) RoomOverlay(app, pet, sim, room) { room = 0 }
         if (!pet.introSeen) IntroOverlay { store.updatePet { it.copy(introSeen = true, seenStage = it.stage) } }
     }
 
@@ -209,7 +223,7 @@ fun BasketScreen(app: App, onBack: () -> Unit) {
 
 // ======================================================================= simulation of the cat
 
-private enum class Mode { IDLE, WALK, PLAY, DANCE, NAP_WALK, NAP_IN, NAP, NAP_OUT }
+private enum class Mode { IDLE, WALK, PLAY, DANCE, NAP_WALK, NAP_IN, NAP, NAP_OUT, SCRATCH_WALK, SCRATCH, GO, TREE_JUMP, REST, ENTER, INSIDE, LEAVE }
 enum class Act { NONE, YARN, MILK, FOOD, BRUSH }
 
 internal data class Heart(val x: Float, val y: Float, val born: Long)
@@ -219,7 +233,7 @@ internal data class Flight(val care: Care, val born: Long)
  * Behaviour of the cat – lives outside of composition and is advanced every frame.
  * x positions are fractions of the scene width; the cat stands in front of the basket.
  */
-class PetSim {
+class PetSim(seed: Long = System.nanoTime()) {
     var x = 0.32f; var facing = 1f
     var anim = CatAnim.WAG; private set
     private var mode = Mode.IDLE; private var until = 0L
@@ -227,6 +241,26 @@ class PetSim {
     val inBasket get() = mode == Mode.NAP
     // jumps (hatching, into / out of the basket)
     var jumpStart = -1L; var jumpDur = 700L; var jumpFromX = 0f; var jumpToX = 0f; var jumpIn = false
+    /** 0 = basket, 1 = a jump between the floor and a spot of the climbing tree */
+    var jumpKind = 0
+    var jumpFromSpot: Spot? = null; var jumpToSpot: Spot? = null
+    /** where the cat stands on the climbing tree (null = on the floor) */
+    var spot: Spot? = null; private set
+    /** 0 = outside, 1 / 2 = at home in that cave (not visible) */
+    var inside = 0; private set
+    /** a tail sticks out of the cave while the cat is at home (only sometimes) */
+    var peekTail = false; private set
+    /** 0 = fully visible .. 1 = gone through the doorway (while entering / leaving) */
+    var doorK = 0f; private set
+    private var doorStart = 0L; private var doorHome = 0
+    private var goSpot: Spot? = null; private var goHome = 0; private var goSleep = false
+    private var restAnim = CatAnim.LOOK; private var restAnimUntil = 0L
+    val scratching get() = mode == Mode.SCRATCH
+    var scratchStart = 0L; private set
+    private var scratchSfxAt = 0L
+    private var lastMeow = 0L
+    /** the cat is somewhere the care items cannot reach it (up in the tree / at home) */
+    private val away get() = spot != null || inside != 0 || mode == Mode.ENTER || mode == Mode.LEAVE
     var hatching = false
     var petting = false; var petEnd = 0L
     // what the cat is doing with an item
@@ -246,7 +280,7 @@ class PetSim {
     /** sounds the screen should play (drained every frame) */
     val sounds = ArrayList<Sfx>()
     private var last = 0L
-    private val rnd = Random(System.nanoTime())
+    private val rnd = Random(seed)
     private var lastHeart = 0L
     var stage = 0
 
@@ -268,11 +302,29 @@ class PetSim {
     var mewAt = 0L; private set
     private var reunionUntil = 0L
     /** back after a long time: the cat is overjoyed */
-    fun reunion(now: Long) { reunionUntil = now + 3200 }
+    fun reunion(now: Long) { reunionUntil = now + 3200; meow(now, long = true, minGap = 0) }
 
-    private fun jump(now: Long, from: Float, to: Float, into: Boolean, dur: Long = 750) {
-        jumpStart = now; jumpFromX = from; jumpToX = to; jumpIn = into; jumpDur = dur
+    /** a meow that fits the cat's age – but never too often */
+    private fun meow(now: Long, long: Boolean = false, minGap: Long = 20_000) {
+        if (stage < PetRules.HATCH_STAGE || now - lastMeow < minGap) return
+        lastMeow = now; sounds += meowFor(stage, long, rnd)
     }
+    /** the cat was touched: sometimes it answers */
+    fun touched(now: Long) { if (rnd.nextFloat() < 0.3f) meow(now, minGap = 8_000) }
+
+    private fun jump(now: Long, from: Float, to: Float, into: Boolean, dur: Long = 750, kind: Int = 0) {
+        jumpStart = now; jumpFromX = from; jumpToX = to; jumpIn = into; jumpDur = dur; jumpKind = kind
+    }
+    /** jumps between the floor and a spot of the tree; the floor point is right below the spot */
+    private fun spotJump(now: Long, from: Spot?, to: Spot?, dur: Long = 900) {
+        val fx = from?.x ?: x
+        val tx = to?.x ?: (from?.x ?: x)
+        jump(now, fx, tx, false, dur, 1)
+        jumpFromSpot = from; jumpToSpot = to; mode = Mode.TREE_JUMP
+    }
+
+    private fun enterDoor(now: Long, home: Int) { doorHome = home; doorStart = now; mode = Mode.ENTER; anim = CatAnim.WALK }
+
     val jumping get() = jumpStart > 0 && last - jumpStart < jumpDur
 
     fun step(now: Long, basketX: Float) {
@@ -284,8 +336,23 @@ class PetSim {
 
         if (jumpStart == -2L) { jump(now, basketX, 0.34f, false, 1500); mode = Mode.IDLE; until = now + 2200 }
         if (jumpStart > 0 && now - jumpStart >= jumpDur) {
-            x = jumpToX; jumpStart = -1L; hatching = false
-            if (jumpIn) { mode = Mode.NAP; until = now + 25_000 + rnd.nextLong(30_000) }
+            x = jumpToX; jumpStart = -1L
+            if (hatching) meow(now, minGap = 0)            // the first "hello"
+            hatching = false
+            when (jumpKind) {
+                1 -> {
+                    spot = jumpToSpot
+                    val s = spot
+                    if (mode == Mode.TREE_JUMP) {
+                        if (s == null) { mode = Mode.IDLE; until = now + 1500 }
+                        else if (goHome == 2 && s == Spot.DOOR_B) enterDoor(now, 2)
+                        else { mode = Mode.REST; until = now + (if (goSleep) 25_000L else 12_000L) + rnd.nextLong(14_000); restAnimUntil = 0L }
+                    }
+                    if (act != Act.NONE && actPhase == 0) actStart = now   // restart the walk to the item
+                }
+                else -> if (jumpIn) { mode = Mode.NAP; until = now + 25_000 + rnd.nextLong(30_000) }
+            }
+            jumpKind = 0
         }
 
         // a new item arrived: start the matching activity (wake up first if napping)
@@ -297,6 +364,24 @@ class PetSim {
             // bowls and yarn go next to the cat; for brushing the cat moves to a comfy spot in the middle
             startAct(care, if (care == Care.BRUSH) x.coerceIn(0.3f, 0.75f)
                 else if (x < 0.55f) (x + 0.17f).coerceAtMost(0.86f) else (x - 0.17f).coerceAtLeast(0.14f), now)
+        }
+        // the doorway animation runs on its own
+        if (mode == Mode.ENTER) {
+            doorK = ((now - doorStart) / 700f).coerceIn(0f, 1f); anim = CatAnim.WALK
+            if (doorK >= 1f) { inside = doorHome; mode = Mode.INSIDE; until = now + 20_000 + rnd.nextLong(40_000); peekTail = rnd.nextFloat() < 0.3f }
+        } else if (mode == Mode.LEAVE) {
+            doorK = 1f - ((now - doorStart) / 700f).coerceIn(0f, 1f); anim = CatAnim.WALK
+            if (doorK <= 0f) {
+                inside = 0; peekTail = false; goSleep = false
+                if (spot != null) { mode = Mode.REST; until = now + 2500; restAnimUntil = 0L } else { mode = Mode.IDLE; until = now + 1500 }
+            }
+        }
+        // an item arrived while the cat is up in the tree or at home: come down / come out first, the activity waits
+        if (act != Act.NONE && !jumping) {
+            when {
+                inside != 0 && mode != Mode.LEAVE -> { mode = Mode.LEAVE; doorStart = now }
+                spot != null && inside == 0 && mode != Mode.ENTER && mode != Mode.LEAVE && mode != Mode.TREE_JUMP -> spotJump(now, spot, null, 800)
+            }
         }
         stepAct(now, dt, basketX)
 
@@ -310,7 +395,9 @@ class PetSim {
             return
         }
         // a sad kitten mews quietly now and then
-        if (mood == de.schnurrfeld.app.data.Mood.SAD && mode != Mode.NAP && now - mewAt > 7000 + rnd.nextLong(3000)) mewAt = now
+        if (mood == de.schnurrfeld.app.data.Mood.SAD && mode != Mode.NAP && now - mewAt > 7000 + rnd.nextLong(3000)) {
+            mewAt = now; meow(now, long = rnd.nextBoolean(), minGap = 5_000)
+        }
 
         when (mode) {
             Mode.WALK, Mode.NAP_WALK -> {
@@ -323,6 +410,51 @@ class PetSim {
                     x += (if (d > 0) 1 else -1) * minOf(abs(d), 0.11f * dt)
                     anim = CatAnim.WALK
                 }
+                return
+            }
+            Mode.SCRATCH_WALK -> {
+                val d = walkTo - x
+                if (abs(d) < 0.01f) {
+                    mode = Mode.SCRATCH; facing = -1f; scratchStart = now; scratchSfxAt = 0L
+                    until = now + 4600 + rnd.nextLong(2600)
+                } else {
+                    facing = if (d > 0) 1f else -1f
+                    x += (if (d > 0) 1 else -1) * minOf(abs(d), 0.12f * dt)
+                    anim = CatAnim.WALK
+                }
+                return
+            }
+            Mode.SCRATCH -> {
+                anim = CatAnim.SCRATCH; facing = -1f
+                if (now - scratchSfxAt > 1250) { scratchSfxAt = now; sounds += Sfx.SCRATCH }
+                if (mood == de.schnurrfeld.app.data.Mood.SAD || now > until) { mode = Mode.IDLE; anim = CatAnim.WAG; until = now + 1600 + rnd.nextLong(1500) }
+                return
+            }
+            Mode.GO -> {
+                if (mood == de.schnurrfeld.app.data.Mood.SAD) { mode = Mode.IDLE; until = now + 500; return }
+                val tx = goSpot?.x ?: Tree.DOOR_A_X
+                val d = tx - x
+                if (abs(d) < 0.01f) {
+                    if (goHome == 1) enterDoor(now, 1) else spotJump(now, null, goSpot)
+                } else {
+                    facing = if (d > 0) 1f else -1f
+                    x += (if (d > 0) 1 else -1) * minOf(abs(d), 0.12f * dt)
+                    anim = CatAnim.WALK
+                }
+                return
+            }
+            Mode.TREE_JUMP, Mode.ENTER, Mode.LEAVE -> return
+            Mode.REST -> {
+                if (now >= restAnimUntil) {
+                    restAnim = if (goSleep) CatAnim.SLEEP else listOf(CatAnim.SLEEP, CatAnim.LOOK, CatAnim.TILT, CatAnim.WAG, CatAnim.LICK).random(rnd)
+                    restAnimUntil = now + (if (restAnim == CatAnim.SLEEP) 9_000L else 3_500L) + rnd.nextLong(3_000)
+                }
+                anim = restAnim
+                if (mood == de.schnurrfeld.app.data.Mood.SAD || now > until) spotJump(now, spot, null)
+                return
+            }
+            Mode.INSIDE -> {
+                if (mood == de.schnurrfeld.app.data.Mood.SAD || now > until) { mode = Mode.LEAVE; doorStart = now }
                 return
             }
             Mode.NAP_IN -> return
@@ -340,18 +472,43 @@ class PetSim {
             when {
                 r < 0.2f -> { mode = Mode.WALK; walkTo = 0.25f + rnd.nextFloat() * 0.5f }
                 r < 0.9f -> { mode = Mode.IDLE; anim = listOf(CatAnim.LOOK, CatAnim.WAG).random(rnd); until = now + 4000 + rnd.nextLong(3000) }
-                else -> { mode = Mode.NAP_WALK; walkTo = basketX - 0.18f }
+                else -> if (stage >= PetRules.KRATZ_STAGE) { mode = Mode.IDLE; anim = CatAnim.LOOK; until = now + 4000 } else { mode = Mode.NAP_WALK; walkTo = basketX - 0.18f }
             }
             return
         }
         val happy = mood == de.schnurrfeld.app.data.Mood.HAPPY
         if (happy && r < 0.12f) { mode = Mode.DANCE; anim = CatAnim.DANCE; until = now + 2200; return }
+        if (stage >= PetRules.KRATZ_STAGE) {
+            val q = rnd.nextFloat()
+            if (q < 0.12f) { mode = Mode.SCRATCH_WALK; walkTo = Tree.SCRATCH_X; return }
+            if (q < 0.34f) { goSpot = listOf(Spot.ROOF_A, Spot.ROOF_B, Spot.STEP).random(rnd); goHome = 0; goSleep = rnd.nextFloat() < 0.45f; mode = Mode.GO; return }
+            if (q < 0.50f) { goHome = if (rnd.nextBoolean()) 1 else 2; goSpot = Tree.spotAt(goHome); goSleep = true; mode = Mode.GO; return }
+        }
+        if (rnd.nextFloat() < 0.1f) meow(now, minGap = 25_000)
         when {
             r < 0.36f -> { mode = Mode.WALK; walkTo = 0.12f + rnd.nextFloat() * 0.76f }
             r < 0.62f -> { mode = Mode.IDLE; anim = listOf(CatAnim.WAG, CatAnim.LOOK, CatAnim.TILT, CatAnim.LICK).random(rnd); until = now + 3000 + rnd.nextLong(3000) }
             r < 0.74f -> { mode = Mode.PLAY; anim = CatAnim.BOUNCE; until = now + 1800 + rnd.nextLong(1500) }
             r < 0.80f -> { mode = Mode.DANCE; anim = CatAnim.DANCE; until = now + 2000 }
-            else -> { mode = Mode.NAP_WALK; walkTo = basketX - 0.18f }   // time for a proper nap in the basket
+            else -> if (stage >= PetRules.KRATZ_STAGE) {
+                goSpot = listOf(Spot.ROOF_A, Spot.ROOF_B, Spot.STEP).random(rnd); goHome = 0; goSleep = true; mode = Mode.GO   // a proper nap up in the tree
+            } else { mode = Mode.NAP_WALK; walkTo = basketX - 0.18f }   // time for a proper nap in the basket
+        }
+    }
+
+    /** for tests and screenshots: put the cat straight into a pose ("scratch", "roofA", "roofB", "step", "homeA", "homeB", "peekA", "peekB") */
+    internal fun debugPose(pose: String, now: Long) {
+        val far = now + 600_000
+        when (pose) {
+            "scratch" -> { x = Tree.SCRATCH_X; facing = -1f; mode = Mode.SCRATCH; scratchStart = now; scratchSfxAt = now; until = far }
+            "roofA", "roofB", "step", "doorB" -> {
+                val s = when (pose) { "roofA" -> Spot.ROOF_A; "roofB" -> Spot.ROOF_B; "doorB" -> Spot.DOOR_B; else -> Spot.STEP }
+                spot = s; x = s.x; mode = Mode.REST; goSleep = false; restAnim = CatAnim.LOOK; restAnimUntil = far; until = far
+            }
+            "homeA", "homeB", "peekA", "peekB" -> {
+                val home = if (pose.endsWith("A")) 1 else 2
+                spot = Tree.spotAt(home); x = Tree.doorX(home); inside = home; doorK = 1f; mode = Mode.INSIDE; until = far; peekTail = pose.startsWith("peek")
+            }
         }
     }
 
@@ -364,6 +521,7 @@ class PetSim {
 
     private fun stepAct(now: Long, dt: Float, basketX: Float) {
         if (act == Act.NONE) return
+        if (away || (jumping && jumpKind != 0)) return          // wait until the cat is back on the floor
         val hidden = stage < PetRules.HATCH_STAGE
         val age = now - actStart
         // walk to the item first (not for brushing – the brush comes to the cat)
@@ -442,8 +600,11 @@ private const val HORIZON = 0.56f     // where the wall meets the floor
 private const val GROUND = 0.9f       // the line the cat stands on (in front of the basket)
 private const val BASKET_X = 0.6f
 
+// the climbing tree (stage KRATZ_STAGE and up) is described in ClimbingTree.kt
+private const val TREE_NEWS = 100         // "reveal" code for the one-time notice about the post
+
 @Composable
-private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
+private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier, onRoom: (Int) -> Unit) {
     val frame = rememberFrameMillis()
     val dark = LocalDark.current
     val settings = app.store.settings
@@ -463,7 +624,11 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
         try {
             while (true) {
                 delay(80)
-                while (sim.sounds.isNotEmpty()) { val sfx = sim.sounds.removeAt(0); if (settings.sound) app.sound.play(sfx, 0.8f) }
+                while (sim.sounds.isNotEmpty()) {
+                    val sfx = sim.sounds.removeAt(0)
+                    if (!settings.sound) continue
+                    if (sfx.isMeow) app.sound.play(sfx, 0.9f, meowRate(sfx, sim.stage)) else app.sound.play(sfx, 0.8f)
+                }
                 if (sim.wantsPurr && purr == 0 && settings.sound) purr = app.sound.loop(Sfx.PURR, if (stage < PetRules.HATCH_STAGE) 0.5f else 0.85f)
                 if (!sim.wantsPurr && purr != 0) { app.sound.stop(purr); purr = 0 }
             }
@@ -480,14 +645,27 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
                     val catSize = catSizeFor(stage, w, h)
                     val bw = basketWidth(stage, w)
                     val bc = Offset(w * BASKET_X, h * (HORIZON + 0.06f))
+                    val treeOn = stage >= PetRules.KRATZ_STAGE
                     val hit = if (stage >= PetRules.HATCH_STAGE && !sim.inBasket) {
-                        val cx = sim.x * w; val cy = h * GROUND - catSize * 0.43f
-                        abs(down.position.x - cx) < catSize * 0.55f && abs(down.position.y - cy) < catSize * 0.6f
-                    } else {
+                        // the cat can only be petted while it is in view
+                        if (sim.inside != 0 || sim.doorK > 0.5f) false else {
+                            val feet = sim.spot?.let { it.feetY * h } ?: (h * GROUND)
+                            val cx = sim.x * w; val cy = feet - catSize * 0.43f
+                            abs(down.position.x - cx) < catSize * 0.55f && abs(down.position.y - cy) < catSize * 0.6f
+                        }
+                    } else if (!treeOn) {
                         abs(down.position.x - bc.x) < bw * 0.5f && abs(down.position.y - bc.y) < bw * 0.25f
+                    } else false
+                    if (!hit) {
+                        // a tap on one of the caves opens the room behind its door
+                        if (treeOn) {
+                            val home = Tree.homeAt(down.position.x / w, down.position.y / h)
+                            if (home != 0 && waitForUpOrCancellation() != null) onRoom(home)
+                        }
+                        return@awaitEachGesture
                     }
-                    if (!hit) return@awaitEachGesture
                     sim.petting = true
+                    sim.touched(frame.value)
                     if (settings.vibration) app.sound.vibrate(Haptic.TICK)
                     var pos = down.position
                     do {
@@ -521,10 +699,14 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
             drawLine(if (dark) Color(0xFF2E2620) else Color(0xFFBF9668), Offset(0f, y), Offset(w, y), 1.5f)
         }
         drawLine(if (dark) Color(0xFF221C17) else Color(0xFFB48A5E), Offset(0f, horizon), Offset(w, horizon), 4f)
-        drawPlant(Offset(w * 0.09f, horizon + h * 0.05f), w * 0.15f, t, dark)
+        val treeOn = stage >= PetRules.KRATZ_STAGE
+        if (!treeOn) drawPlant(Offset(w * 0.09f, horizon + h * 0.05f), w * 0.15f, t, dark)
         // rug in front of the basket
         drawOval(if (dark) Color(0xFF5B3F55) else Color(0xFFF2B8C6), Offset(w * 0.08f, ground - h * 0.06f), Size(w * 0.84f, h * 0.13f))
         drawOval(if (dark) Color(0xFF6E4E67) else Color(0xFFF7CFD9), Offset(w * 0.15f, ground - h * 0.045f), Size(w * 0.7f, h * 0.1f))
+
+        // ---- the climbing tree replaces the basket from the teenager stage on
+        if (treeOn) drawClimbingTree(w, h, t, dark, rake = if (sim.scratching) (now - sim.scratchStart) / 1000f else -1f)
 
         // ---- basket
         val bw = basketWidth(stage, w)
@@ -532,7 +714,7 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
         val catSize = catSizeFor(stage, w, h)
         val growth = ((stage - PetRules.HATCH_STAGE).toFloat() / (PetRules.ADULT_STAGE - PetRules.HATCH_STAGE)).coerceIn(0f, 1f)
         val wiggle = if (sim.petting) 0.35f else if (now < sim.wiggleUntil) 1f else 0f
-        drawBedBack(bc, bw)
+        if (!treeOn) drawBedBack(bc, bw)
 
         val hidden = stage < PetRules.HATCH_STAGE
         val breed = pet.breed ?: Breed.WOLKE
@@ -543,7 +725,7 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
 
         if (hidden) {
             drawHidden(pet, stage, bc, bw, t, wiggle)
-        } else {
+        } else if (!treeOn) {
             if (sim.inBasket) drawCat(catOnCushion, catSize, fur, CatAnim.SLEEP, t, look = look)
             drawBedFront(bc, bw)
         }
@@ -558,13 +740,22 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
             val cx = sim.x * w
             if (sim.jumping) {
                 val k = ((now - sim.jumpStart) / sim.jumpDur.toFloat()).coerceIn(0f, 1f)
-                val fromIn = !sim.jumpIn   // jumping out of the basket
-                val fromY = if (fromIn) catOnCushion.y else ground - catSize * 0.43f
-                val toY = if (sim.jumpIn) catOnCushion.y else ground - catSize * 0.43f
-                val x = (sim.jumpFromX + (sim.jumpToX - sim.jumpFromX) * k) * w
-                val y = fromY + (toY - fromY) * k - sin(k * PI.toFloat()) * h * 0.2f
-                drawCat(Offset(x, y), catSize, fur, CatAnim.BOUNCE, t, look = lookOf(breed, growth, if (sim.jumpToX > sim.jumpFromX) 1f else -1f))
-                if (sim.hatching) sparkle(Offset(x, y), catSize, now - sim.jumpStart)
+                val tx = (sim.jumpFromX + (sim.jumpToX - sim.jumpFromX) * k) * w
+                val facing = if (sim.jumpToX > sim.jumpFromX) 1f else -1f
+                if (sim.jumpKind == 0) {
+                    val fromIn = !sim.jumpIn   // jumping out of the basket
+                    val fromY = if (fromIn) catOnCushion.y else ground - catSize * 0.43f
+                    val toY = if (sim.jumpIn) catOnCushion.y else ground - catSize * 0.43f
+                    val y = fromY + (toY - fromY) * k - sin(k * PI.toFloat()) * h * 0.2f
+                    drawCat(Offset(tx, y), catSize, fur, CatAnim.BOUNCE, t, look = lookOf(breed, growth, facing))
+                    if (sim.hatching) sparkle(Offset(tx, y), catSize, now - sim.jumpStart)
+                } else {
+                    // between the floor and a spot of the tree
+                    val fromFeet = sim.jumpFromSpot?.let { it.feetY * h } ?: ground
+                    val toFeet = sim.jumpToSpot?.let { it.feetY * h } ?: ground
+                    val feet = fromFeet + (toFeet - fromFeet) * k - sin(k * PI.toFloat()) * h * 0.12f
+                    drawCat(Offset(tx, feet - catSize * 0.43f), catSize, fur, CatAnim.BOUNCE, t, look = lookOf(breed, growth, facing))
+                }
             } else if (sim.act == Act.BRUSH && sim.actPhase() == 1) {
                 val center = Offset(cx, ground - catSize * 0.43f)
                 drawCatSide(center, catSize, fur, look, t, 1f)
@@ -581,7 +772,15 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier) {
                 }
                 if ((now / 400) % 2 == 0L) sim.heart(cx / w, (ground - catSize * 0.95f) / h, now)
             } else {
-                drawCat(Offset(cx, ground - catSize * 0.43f), catSize, fur, sim.anim, t, look = look)
+                val feet = sim.spot?.let { it.feetY * h } ?: ground
+                if (sim.inside != 0) {
+                    // at home: not in view – only now and then a tail sticks out of the doorway
+                    if (sim.peekTail) drawTailPeek(w, h, sim.inside, look?.tail ?: fur.base, look?.tailShade ?: fur.shade, t)
+                } else if (sim.doorK > 0f) {
+                    // walking through the doorway: fades and shrinks a little
+                    val sc = 1f - 0.2f * sim.doorK
+                    withAlpha(1f - sim.doorK) { drawCat(Offset(cx, feet - catSize * sc * 0.43f - h * 0.012f * sim.doorK), catSize * sc, fur, sim.anim, t, look = look) }
+                } else drawCat(Offset(cx, feet - catSize * 0.43f), catSize, fur, sim.anim, t, look = look)
             }
         }
         // the yarn ball rolls in front of the cat
@@ -668,8 +867,8 @@ private fun catSizeFor(stage: Int, w: Float, h: Float): Float {
         stage <= 2 -> 0.27f      // just hatched
         stage == 3 -> 0.32f      // baby
         stage == 4 -> 0.37f      // young cat
-        stage == 5 -> 0.42f      // teenager
-        else -> 0.47f            // grown up
+        stage == 5 -> 0.33f      // teenager (the climbing tree room is bigger, the cat looks smaller next to it)
+        else -> 0.35f            // grown up
     }
 }
 
@@ -723,7 +922,7 @@ private fun ProgressPanel(pet: Pet, level: Int) {
             }
             if (next > PetRules.MAX_STAGE) {
                 Gap(4.dp)
-                Text("Voll ausgewachsen! 🎉 Kratzbaum, Kleidung und der Pappkarton-Palast kommen mit den nächsten Updates.",
+                Text("Voll ausgewachsen! 🎉 Kleidung und der Pappkarton-Palast kommen mit den nächsten Updates.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 return@Column
             }
@@ -760,26 +959,29 @@ private fun GoalRow(label: String, value: Int, max: Int, hint: String, color: Co
 }
 
 @Composable
-private fun RevealCard(stage: Int, breed: Breed?, modifier: Modifier, onClose: () -> Unit) {
+private fun RevealCard(stage: Int, breed: Breed?, treeNote: Boolean, modifier: Modifier, onClose: () -> Unit) {
     val name = breed?.title ?: "Dein Kätzchen"
+    val news = stage == TREE_NEWS
+    val tree = "\n\nNeu im Zimmer: ein großer Kratzbaum mit zwei Wohnhöhlen. Tippe auf eine Höhle, um nachzusehen, ob $name zu Hause ist."
     val text = when (stage) {
+        TREE_NEWS -> "Das Körbchen ist zu klein geworden: Jetzt steht ein großer Kratzbaum im Zimmer. $name kratzt, klettert, schläft oben auf den Kissen oder zieht sich in eine Wohnhöhle zurück. Tippe auf eine Höhle, um nachzusehen!"
         1 -> "Da wackelt etwas! Ein Schwänzchen schaut aus der Decke."
         2 -> "Hallo, $name! Dein Kätzchen ist aus dem Körbchen gesprungen!"
         3 -> "$name ist jetzt eine Babykatze und wächst und wächst."
         4 -> "$name ist eine Jungkatze! Und es gibt ein größeres Körbchen."
-        5 -> "$name ist jetzt eine Teenie-Katze – fast schon groß!"
+        5 -> "$name ist jetzt eine Teenie-Katze – fast schon groß! Das Körbchen ist zu klein geworden."
         6 -> "$name ist ausgewachsen! Eine wunderschöne Katze."
         else -> "$name hat sich weiterentwickelt!"
-    }
+    } + (if (treeNote && !news) tree else "")
     LaunchedEffect(stage) { delay(if (stage == PetRules.HATCH_STAGE) 1700 else 400) }
     Surface(
         modifier = modifier.widthIn(max = 420.dp).padding(24.dp), shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh, shadowElevation = 12.dp,
     ) {
         Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("✨ Neue Stufe ✨", style = MaterialTheme.typography.labelLarge, color = Gold)
+            Text(if (news) "✨ Neu im Zimmer ✨" else "✨ Neue Stufe ✨", style = MaterialTheme.typography.labelLarge, color = Gold)
             Gap(6.dp)
-            Text(PetRules.stageNames[stage], style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+            Text(if (news) "Ein Kratzbaum!" else PetRules.stageNames[stage], style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
             Gap(8.dp)
             Text(text, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Gap(14.dp)

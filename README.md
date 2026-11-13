@@ -9,7 +9,8 @@ Die neueste APK unter [Releases](https://github.com/arthurtschik/Schnurrfeld/rel
 
 ## Features
 - Fehlende Aufnahme (wird nicht genutzt, solange Finish/Nice job vorhanden sind): `voice_you_did_it.ogg` in `app/src/main/res/raw/` ablegen oder in der App aufnehmen
-- 200 Levels (5×5 bis 10×10) mit sanftem Einstieg: Level 1–12 brauchen nur einfache Schritte, schwierigere Logik kommt nach und nach; jedes Rätsel hat genau eine Lösung
+- 500 Levels (5×5 bis 10×10) mit sanftem Einstieg: Level 1–12 brauchen nur einfache Schritte, schwierigere Logik kommt nach und nach; ab Level 201 beginnt eine zweite, durchgehend anspruchsvolle Runde. Jedes Rätsel hat genau eine Lösung
+- Ein laufendes Rätsel (Level, Tagesrätsel, Endlos) geht bei einem Anruf oder App-Wechsel nicht verloren: Es wird laufend gesichert und nach einem Neustart genau dort fortgesetzt
 - ✕ setzen und entfernen ist immer kostenlos – nur falsche Katzen kosten ein Leben
 - Tagesrätsel (7×7 bis 10×10 je nach Wochentag, mit Tage-Serie) und Endlos-Modus (Rekord)
 - 3 Leben pro Rätsel; falsche Katzen kosten ein Leben und die Kombo
@@ -36,11 +37,15 @@ Die Levels sind in `app/src/main/assets/levels.txt` vorberechnet. Neu erzeugen (
 ```bash
 DUMP_LEVELS=1 ./gradlew :app:testDebugUnitTest --tests '*DumpLevels*'
 ```
+Mit `DUMP_FROM=201` bleiben die ersten 200 Levels unverändert und nur die neuen werden erzeugt (das gilt auch für die Schwierigkeits-Etiketten).
 Sounds werden synthetisch erzeugt (`app/src/main/res/raw/*.wav`) und lassen sich durch eigene WAV-Dateien mit gleichem Namen ersetzen.
 
 
 ## Katzenkörbchen (ab 1.2)
 Ein Bündel im Körbchen, das man mit Leckerli, Katzenmilch, Streichelbürste und Wollknäuel großzieht.
+Ab der Teenie-Stufe (Stufe 5) wird das Körbchen zu klein: Ein großer Kratzbaum zieht ein (ab 1.3), mit zwei Wohnhöhlen in Katzengröße,
+Kissen auf den Dächern und einer niedrigen Stufe. Die Katze kratzt, klettert, schläft oben oder verschwindet in einer Höhle (manchmal schaut der Schwanz heraus).
+Ein Tipp auf eine Höhle zeigt das Zimmer dahinter: ein Wohnzimmer mit Kamin und Schaukelstuhl, ein Schlafzimmer mit Bett und Nachtfenster. Dazu gibt es echte Miau-Aufnahmen, abhängig vom Alter der Katze.
 Taler: 5 Startkapital, +1 pro neu gelöstem Level, +1 fürs Tagesrätsel, +1 pro Tag fürs Öffnen der App und am Taler-Automaten (10 Tipps oder 5 Joker = 1 Taler). Die Katze entwickelt sich, sobald Pflege und Level reichen,
 eine Stufe nach der anderen. Stufen, Preise und Regeln: `app/src/main/java/de/schnurrfeld/app/data/Pet.kt` (`PetRules`).
 

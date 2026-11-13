@@ -19,7 +19,10 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 // the first 7 are used on the board; PURR and WALK are for the pet in the Katzenkörbchen
-enum class CatAnim { DANCE, LICK, SLEEP, WAG, TILT, BOUNCE, LOOK, PURR, WALK, EAT, SWAT }
+enum class CatAnim { DANCE, LICK, SLEEP, WAG, TILT, BOUNCE, LOOK, PURR, WALK, EAT, SWAT, SCRATCH }
+
+/** the animations the puzzle board hands out to its cats (SCRATCH belongs to the scratching post) */
+val BoardAnims = CatAnim.entries.filter { it != CatAnim.SCRATCH }
 
 /**
  * Optional breed details for the Katzenkörbchen cats.
@@ -134,6 +137,14 @@ fun DrawScope.drawCat(center: Offset, size: Float, fur: Fur, anim: CatAnim, t: F
             bodyRot = 4f * k; headRot = 5f * k
             pupilX = 2.5f
             tailSway = sin(t * 7f)
+        }
+        CatAnim.SCRATCH -> {                      // stretched out at the post, raking it with one paw (cat faces the post)
+            val k = sin(t * 11f)
+            rightPaw = Offset(40f + 2.5f * k, -4f + 12f * k)
+            bodyRot = 6f; sy = 1.07f; sx = 0.97f
+            headRot = -3f + 2f * k
+            eyes = 1; pupilX = 0f
+            tailSway = sin(t * 5f) * 0.9f
         }
         CatAnim.EAT -> {                          // head down in the bowl, munching
             headDrop = 15f + sin(t * 11f) * 1.6f

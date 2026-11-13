@@ -72,6 +72,8 @@ class GameController(
     private val scope: CoroutineScope,
     /** 0 in tests: no animation delays */
     private val animate: Boolean = true,
+    /** a saved game to continue (the puzzle is rebuilt, the board and lives restored) */
+    private val resume: GameSnapshot? = null,
 ) {
     var puzzle by mutableStateOf<Puzzle?>(null); private set
     val cells = mutableStateListOf<Int>()
@@ -124,6 +126,30 @@ class GameController(
 
     private var loadJob: Job? = null
     private var endlessSeed = Random.nextLong()
+    private var resumed = false
+
+    init {
+        if (resume != null && mode == GameMode.Endless) { endlessSeed = resume.endlessSeed; endlessSolved = resume.endlessSolved }
+    }
+
+    /** the running game for saving, or null while loading / after the end / in the tutorial */
+    fun snapshot(): GameSnapshot? {
+        if (puzzle == null || status != Status.PLAYING) return null
+        val (kind, arg) = when (mode) {
+            is GameMode.Level -> 'L' to mode.number.toString()
+            is GameMode.Daily -> 'D' to mode.date.toString()
+            GameMode.Endless -> 'E' to ""
+            GameMode.Tutorial -> return null
+        }
+        return GameSnapshot(kind, arg, cells.joinToString("") { it.toString() }, lives, elapsed, mistakes, streak, playerCats, endlessSolved, endlessSeed, System.currentTimeMillis())
+    }
+
+    private fun applySnapshot(s: GameSnapshot, p: Puzzle) {
+        if (s.cells.length != p.size * p.size) return
+        cells.clear(); cells.addAll(s.cells.map { it - '0' })
+        lives = s.lives; elapsed = s.elapsed; mistakes = s.mistakes; streak = s.streak; playerCats = s.playerCats
+        found = s.cells.count { it - '0' == Cell.CAT }
+    }
     private var prefetch: Pair<Int, Deferred<Puzzle>>? = null
 
     val title: String
@@ -161,6 +187,7 @@ class GameController(
                 }
             }
             setup(p)
+            if (!resumed) { resumed = true; resume?.let { applySnapshot(it, p) } }
             if (mode == GameMode.Endless) {
                 // generate the next puzzle in the background while this one is played
                 val next = endlessSolved + 1

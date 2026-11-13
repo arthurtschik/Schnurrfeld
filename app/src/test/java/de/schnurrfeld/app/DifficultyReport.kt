@@ -15,8 +15,13 @@ class DifficultyReport {
     @Test fun tags() {
         if (System.getenv("DUMP_LEVELS") != "1") return
         val bank = LevelBank { File("src/main/assets/levels.txt").inputStream() }
-        val rows = (1..Levels.count).map { l -> val p = bank.level(l); Triple(l, p.size, LogicRater.analyze(p)) }
+        // DUMP_FROM=201: keep the tags of the first wave as they are, rate only the new levels (against each other)
+        val from = System.getenv("DUMP_FROM")?.toIntOrNull() ?: 1
+        val oldTags = if (from > 1) File("src/main/assets/level_tags.txt").readText().trim().take(from - 1) else ""
+        check(oldTags.length == from - 1)
+        val rows = (from..Levels.count).toList().parallelStream().map { l -> val p = bank.level(l); Triple(l, p.size, LogicRater.analyze(p)) }.toList()
         val tags = IntArray(Levels.count + 1)
+        oldTags.forEachIndexed { i, c -> tags[i + 1] = c.digitToInt() }
         for ((_, band) in rows.groupBy { it.second }) {
             val scores = band.map { it.third.score }.sorted()
             fun pct(q: Double) = scores[minOf(scores.size - 1, (scores.size * q).toInt())]

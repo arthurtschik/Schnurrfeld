@@ -44,7 +44,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +74,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
 import de.schnurrfeld.app.App
 import de.schnurrfeld.app.Screen
@@ -94,7 +97,7 @@ import kotlin.math.sin
 @Composable
 fun GameScreen(app: App, mode: GameMode, onBack: () -> Unit, navigate: (Screen.Game) -> Unit, onBasket: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
-    val ctrl = remember(mode) { GameController(mode, app.store, app.sound, app.voice, app.levels, scope) }
+    val ctrl = remember(mode) { GameController(mode, app.store, app.sound, app.voice, app.levels, scope, resume = app.takeResume(mode)) }
     LaunchedEffect(ctrl) { ctrl.start() }
     val settings = app.store.settings
     val progress = app.store.progress
@@ -107,6 +110,22 @@ fun GameScreen(app: App, mode: GameMode, onBack: () -> Unit, navigate: (Screen.G
                 while (true) { delay(1000); ctrl.elapsed++ }
             }
         }
+    }
+
+    // keep the running game saved: whenever the board, the lives etc. change, and always when the app is paused
+    // (phone call, another app) – so the game also survives Android clearing the app from memory
+    LaunchedEffect(ctrl) {
+        snapshotFlow { ctrl.snapshot()?.copy(elapsed = 0, savedAt = 0L) }.collect { snap ->
+            if (snap != null) ctrl.snapshot()?.let { app.store.saveGame(it.encode()) }
+        }
+    }
+    LaunchedEffect(ctrl.status) { if (ctrl.status == Status.WON || ctrl.status == Status.LOST) app.store.saveGame(null) }
+    DisposableEffect(lifecycle, ctrl) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) ctrl.snapshot()?.let { app.store.saveGame(it.encode()) }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
 
     // beginner help: check once a second whether the player seems stuck

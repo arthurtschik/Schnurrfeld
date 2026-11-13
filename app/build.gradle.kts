@@ -20,8 +20,8 @@ android {
         applicationId = "de.schnurrfeld.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.2.2"
+        versionCode = 15
+        versionName = "1.3"
     }
 
     // "play" = the normal app, "dev" = a separate app (own data, own icon) with a developer menu
