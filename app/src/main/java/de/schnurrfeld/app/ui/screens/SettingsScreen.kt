@@ -18,7 +18,6 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.RecordVoiceOver
@@ -59,7 +58,7 @@ import de.schnurrfeld.app.ui.components.SectionTitle
 import de.schnurrfeld.app.ui.components.TopBar
 
 @Composable
-fun SettingsScreen(app: App, onBack: () -> Unit, onVoice: () -> Unit) {
+fun SettingsScreen(app: App, onBack: () -> Unit) {
     val s = app.store.settings
     val update = app.store::updateSettings
     var confirmReset by remember { mutableStateOf(false) }
@@ -106,7 +105,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit, onVoice: () -> Unit) {
                 Divider()
                 SwitchRow(Icons.Rounded.Vibration, "Vibration", null, s.vibration) { update { st -> st.copy(vibration = it) } }
                 Divider()
-                SwitchRow(Icons.Rounded.RecordVoiceOver, "Lob-Stimme", "Nice! → Amazing! → … → Unbelievable! – steigert sich mit jeder fehlerfreien Katze", s.voice) {
+                SwitchRow(Icons.Rounded.RecordVoiceOver, "Lob-Stimme", "Nice! → Great! → Incredible! – steigert sich mit jeder fehlerfreien Katze", s.voice) {
                     update { st -> st.copy(voice = it) }
                     if (it) app.voice.warmUp(s.ttsFallback)
                 }
@@ -115,8 +114,6 @@ fun SettingsScreen(app: App, onBack: () -> Unit, onVoice: () -> Unit) {
                     update { st -> st.copy(ttsFallback = it) }
                     if (it) app.voice.warmUp(true)
                 }
-                Divider()
-                NavRow(Icons.Rounded.Mic, "Eigene Lob-Stimme", "Mitgelieferte Stimme ersetzen: aufnehmen oder importieren", onVoice)
             }
 
             ChangelogSection()
@@ -164,7 +161,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit, onVoice: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Alles zurücksetzen?") },
-            text = { Text("Dein gesamter Spielfortschritt wird gelöscht. Einstellungen und Aufnahmen bleiben erhalten.") },
+            text = { Text("Dein gesamter Spielfortschritt wird gelöscht. Einstellungen bleiben erhalten.") },
             confirmButton = {
                 TextButton(onClick = { app.store.resetProgress(); confirmReset = false }) {
                     Text("Zurücksetzen", color = MaterialTheme.colorScheme.error)

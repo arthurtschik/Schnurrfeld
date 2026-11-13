@@ -38,14 +38,12 @@ import de.schnurrfeld.app.ui.screens.GameScreen
 import de.schnurrfeld.app.ui.screens.LevelsScreen
 import de.schnurrfeld.app.ui.screens.MenuScreen
 import de.schnurrfeld.app.ui.screens.SettingsScreen
-import de.schnurrfeld.app.ui.screens.VoiceScreen
 import de.schnurrfeld.app.ui.theme.SchnurrTheme
 
 sealed class Screen {
     data object Menu : Screen()
     data object Levels : Screen()
     data object Settings : Screen()
-    data object Voice : Screen()
     data object Tutorial : Screen()
     data object Basket : Screen()
     data class Game(val mode: GameMode, val from: Screen = Menu) : Screen()
@@ -116,7 +114,6 @@ private fun AppNav(app: App) {
         if (screen is Screen.Game) app.store.saveGame(null)      // left on purpose: nothing to resume
         screen = when (val s = screen) {
             is Screen.Game -> s.from
-            Screen.Voice -> Screen.Settings
             else -> Screen.Menu
         }
     }
@@ -144,8 +141,7 @@ private fun AppNav(app: App) {
         when (s) {
             Screen.Menu -> MenuScreen(app, navigate = { screen = it })
             Screen.Levels -> LevelsScreen(app, onBack = back, onPlay = { screen = Screen.Game(GameMode.Level(it), Screen.Levels) })
-            Screen.Settings -> SettingsScreen(app, onBack = back, onVoice = { screen = Screen.Voice })
-            Screen.Voice -> VoiceScreen(app, onBack = back)
+            Screen.Settings -> SettingsScreen(app, onBack = back)
             Screen.Tutorial -> de.schnurrfeld.app.ui.screens.TutorialScreen(app) {
                 app.store.updateSettings { it.copy(tutorialDone = true) }
                 screen = Screen.Menu

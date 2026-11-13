@@ -8,13 +8,12 @@ Ein Katzen-Logikrätsel für Android (Kotlin + Jetpack Compose).
 Die neueste APK unter [Releases](https://github.com/arthurtschik/Schnurrfeld/releases/latest) herunterladen, öffnen und „Installation aus unbekannten Quellen“ erlauben (Android 8+).
 
 ## Features
-- Fehlende Aufnahme (wird nicht genutzt, solange Finish/Nice job vorhanden sind): `voice_you_did_it.ogg` in `app/src/main/res/raw/` ablegen oder in der App aufnehmen
 - 500 Levels (5×5 bis 10×10) mit sanftem Einstieg: Level 1–12 brauchen nur einfache Schritte, schwierigere Logik kommt nach und nach; ab Level 201 beginnt eine zweite, durchgehend anspruchsvolle Runde. Jedes Rätsel hat genau eine Lösung
 - Ein laufendes Rätsel (Level, Tagesrätsel, Endlos) geht bei einem Anruf oder App-Wechsel nicht verloren: Es wird laufend gesichert und nach einem Neustart genau dort fortgesetzt
 - ✕ setzen und entfernen ist immer kostenlos – nur falsche Katzen kosten ein Leben
 - Tagesrätsel (7×7 bis 10×10 je nach Wochentag, mit Tage-Serie) und Endlos-Modus (Rekord)
 - 3 Leben pro Rätsel; falsche Katzen kosten ein Leben und die Kombo
-- Gesprochenes Lob (eigene Aufnahmen): Nice → Great → Incredible, steigert sich im Rätsel; nicht bei jeder Katze und nie bei der ersten
+- Gesprochenes Lob (mitgelieferte Aufnahmen): Nice → Great → Incredible, steigert sich im Rätsel; nicht bei jeder Katze und nie bei der ersten
 - Erfolgs-Glöckchen in 5 Stufen, die mit der fehlerfreien Serie immer festlicher werden
 - Kombo-Ansagen kommen immer: „Kombo“ (kein ✕ zwischen zwei Katzen), „Quick Kombo“ (< 20 s), „Super fast“ (< 10 s)
 - Kombo-Leiste mit schimmernder Milch, feste Punkte: 3 Katzen in Folge +1 · Kombo +1 · Quick Kombo +2 · Super fast +3 · Purrfect +3 · Tagesrätsel +1; bei 9 Punkten abwechselnd Tipp/Joker, ein Fehler leert sie. Die Schriftzüge verflüssigen sich und fließen als Milchtropfen in die Leiste
@@ -24,7 +23,6 @@ Die neueste APK unter [Releases](https://github.com/arthurtschik/Schnurrfeld/rel
 - Chibi-Katzen mit 7 Animationen (tanzen, putzen, schlafen, Schwanzwedeln, Kopf neigen, hüpfen, umschauen); beim Sieg tanzen alle
 - Hell- und Dunkelmodus, 12 gut unterscheidbare Farben, jede mit eigenem dezenten Motiv (Punkte, Herzen, Sterne, Pfoten, Blüten, Monde …), optionale Farbhilfe mit kräftigeren Mustern
 - Einstellungen: Design, Timer, Auto-✕, Sounds, Vibration, Lob-Stimme, Computerstimme als Ersatz
-- Eigene Lob-Stimme direkt in der App aufnehmen oder Audiodateien importieren
 
 ## Bedienung
 Tippen → ✕ setzen · ✕ nochmal antippen → ✕ entfernen (kostenlos) · schnell doppeltippen → Katze · wischen → viele ✕ auf einmal
@@ -68,7 +66,7 @@ Die App sucht beim Start und auf Knopfdruck unter Einstellungen › App nach neu
 
 ## Datenschutz
 - Keine Konten, keine Werbung, kein Tracking, keine Analyse-Dienste. Der Spielstand liegt nur auf dem Gerät.
-- Das Mikrofon wird nur benutzt, wenn du selbst ein Lob-Wort aufnimmst. Aufnahmen bleiben auf dem Gerät und sind vom Android-Cloud-Backup ausgenommen.
+- Die App braucht kein Mikrofon und nimmt nichts auf.
 - Die einzige Netzwerkverbindung ist die Update-Suche bei GitHub (abschaltbar unter Einstellungen › App). Dabei sieht GitHub wie bei jedem Webseitenaufruf deine IP-Adresse.
 
 Mehr zur Sicherheit: [SECURITY.md](SECURITY.md)
