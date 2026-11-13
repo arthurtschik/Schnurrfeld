@@ -68,7 +68,7 @@ class Screenshots {
 
     @Test fun menuLight() { val a = app(); setContent(false) { MenuScreen(a) {} }; settle(); shot("menu_light") }
     @Test fun menuDark() { val a = app(); setContent(true) { MenuScreen(a) {} }; settle(); shot("menu_dark") }
-    @Test fun settings() { val a = app(); setContent(true) { SettingsScreen(a, {}, {}) }; settle(); shot("settings_dark") }
+    @Test fun settings() { val a = app(); setContent(true) { SettingsScreen(a, {}) }; settle(); shot("settings_dark") }
 
     private fun playLevel(level: Int, dark: Boolean, name: String, cats: Int, wrong: Boolean = true, assist: Boolean = false) {
         val a = app()

@@ -47,7 +47,7 @@ class UpdateShots {
     @Test fun settings() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val app = App(Store(ctx), SoundManager(ctx), VoiceManager(ctx), LevelBank { File("src/main/assets/levels.txt").inputStream() })
-        rule.setContent { SchnurrTheme(false) { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { SettingsScreen(app, {}, {}) } } }
+        rule.setContent { SchnurrTheme(false) { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { SettingsScreen(app, {}) } } }
         rule.onNodeWithText("Fortschritt zurücksetzen").performScrollTo()
         rule.waitForIdle()
         rule.onRoot().captureRoboImage("$out/update_settings.png")
@@ -56,7 +56,7 @@ class UpdateShots {
     @Test fun changelog() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val app = App(Store(ctx), SoundManager(ctx), VoiceManager(ctx), LevelBank { File("src/main/assets/levels.txt").inputStream() })
-        rule.setContent { SchnurrTheme(false) { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { SettingsScreen(app, {}, {}) } } }
+        rule.setContent { SchnurrTheme(false) { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { SettingsScreen(app, {}) } } }
         rule.onNodeWithTag("changelog_1.2.2").performScrollTo()
         rule.waitForIdle()
         rule.onRoot().captureRoboImage("$out/changelog_a.png")

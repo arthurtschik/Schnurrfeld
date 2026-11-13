@@ -40,6 +40,7 @@ object Changelog {
                     "Die Katze ist in den Stufen 5 und 6 etwas kleiner, damit sie zu den neuen Möbeln passt",
                     "Gibst du der Katze etwas, lässt sie ihre Pläne sofort fallen und kommt zum Futter, zur Milch oder zum Spielzeug",
                     "Beschädigte Spieldaten bringen die App nicht mehr zum Absturz",
+                    "Entfernt: die Aufnahme und der Import eigener Lob-Stimmen. Die App braucht dadurch keine Mikrofon-Berechtigung mehr",
                     "Neu in den Einstellungen: der Bereich \"Was ist neu\"",
                 )),
             ),

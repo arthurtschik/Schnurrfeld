@@ -1,14 +1,9 @@
 package de.schnurrfeld.app.audio
 
 import android.content.Context
-import android.media.MediaPlayer
-import android.media.MediaRecorder
-import android.net.Uri
-import android.os.Build
 import android.speech.tts.TextToSpeech
 import android.media.AudioAttributes
 import android.media.SoundPool
-import androidx.compose.runtime.mutableIntStateOf
 import java.io.File
 import java.util.Locale
 
@@ -56,15 +51,13 @@ enum class Praise(val text: String, val resName: String, val tier: Int, val kind
     }
 }
 
-/** upper limit for imported voice files */
-private const val MAX_IMPORT_BYTES = 10L * 1024 * 1024
-
 class VoiceManager(private val context: Context) {
-    private val dir = File(context.filesDir, "voice").apply { mkdirs() }
+    init {
+        // older versions could record own voices: that feature is gone, so the leftover files are removed
+        runCatching { File(context.filesDir, "voice").takeIf { it.exists() }?.deleteRecursively() }
+    }
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var player: MediaPlayer? = null
-    private var recorder: MediaRecorder? = null
     private val pool = SoundPool.Builder().setMaxStreams(2).setAudioAttributes(
         AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
@@ -75,9 +68,6 @@ class VoiceManager(private val context: Context) {
         if (id != 0) p to pool.load(context, id, 1) else null
     }.toMap()
     private var lastStream = 0
-
-    /** bumps whenever recordings change, so the UI can refresh */
-    val revision = mutableIntStateOf(0)
 
     private fun ensureTts() {
         if (tts != null) return
@@ -93,106 +83,23 @@ class VoiceManager(private val context: Context) {
 
     fun warmUp(useTts: Boolean) { if (useTts) ensureTts() }
 
-    fun fileFor(p: Praise) = File(dir, "${p.name.lowercase()}.audio")
-    fun hasRecording(p: Praise) = fileFor(p).let { it.exists() && it.length() > 0 }
-
     fun hasBundled(p: Praise) = bundledIds.containsKey(p)
 
-    /** true if this word will actually be heard (own recording or bundled file) */
-    fun isAvailable(p: Praise) = hasRecording(p) || hasBundled(p)
+    /** true if this word will actually be heard from a bundled recording */
+    fun isAvailable(p: Praise) = hasBundled(p)
 
     fun speak(p: Praise, ttsFallback: Boolean) {
-        if (hasRecording(p)) {
-            playFile(fileFor(p))
-        } else if (bundledIds[p] != null) {
+        val id = bundledIds[p]
+        if (id != null) {
             pool.stop(lastStream)
-            lastStream = pool.play(bundledIds[p]!!, 0.95f, 0.95f, 2, 0, 1f)
+            lastStream = pool.play(id, 0.95f, 0.95f, 2, 0, 1f)
         } else if (ttsFallback) {
             ensureTts()
             if (ttsReady) tts?.speak(p.text, TextToSpeech.QUEUE_FLUSH, null, p.name)
         }
     }
 
-    fun playFile(f: File) {
-        runCatching {
-            player?.release()
-            player = MediaPlayer().apply {
-                setDataSource(f.absolutePath)
-                setOnCompletionListener { it.release(); if (player === it) player = null }
-                prepare()
-                start()
-            }
-        }
-    }
-
-    fun startRecording(p: Praise): Boolean = runCatching {
-        stopRecording()
-        val tmp = File(dir, "${p.name.lowercase()}.tmp")
-        val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
-        r.setAudioSource(MediaRecorder.AudioSource.MIC)
-        r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        r.setAudioEncodingBitRate(128_000)
-        r.setAudioSamplingRate(44_100)
-        r.setOutputFile(tmp.absolutePath)
-        r.prepare()
-        r.start()
-        recorder = r
-        recordingFor = p
-        true
-    }.getOrElse { recorder = null; recordingFor = null; false }
-
-    var recordingFor: Praise? = null
-        private set
-
-    fun stopRecording() {
-        val r = recorder ?: return
-        val p = recordingFor
-        runCatching { r.stop() }
-        r.release()
-        recorder = null
-        recordingFor = null
-        if (p != null) {
-            val tmp = File(dir, "${p.name.lowercase()}.tmp")
-            if (tmp.exists() && tmp.length() > 0) tmp.renameTo(fileFor(p).also { it.delete() })
-        }
-        revision.intValue++
-    }
-
-    /** Copies a picked audio file into the app. Capped (a spoken word is a few seconds) and written atomically. */
-    fun import(p: Praise, uri: Uri): Boolean {
-        val tmp = File(dir, "${p.name.lowercase()}.tmp")
-        return runCatching {
-            var size = 0L
-            context.contentResolver.openInputStream(uri)!!.use { input ->
-                tmp.outputStream().use { out ->
-                    val buf = ByteArray(32 * 1024)
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        size += n
-                        require(size <= MAX_IMPORT_BYTES) { "file too large" }
-                        out.write(buf, 0, n)
-                    }
-                }
-            }
-            require(size > 0) { "empty file" }
-            val target = fileFor(p)
-            target.delete()
-            require(tmp.renameTo(target)) { "rename failed" }
-            revision.intValue++
-            true
-        }.getOrElse { tmp.delete(); false }
-    }
-
-    fun delete(p: Praise) {
-        fileFor(p).delete()
-        revision.intValue++
-    }
-
     fun release() {
-        stopRecording()
-        player?.release(); player = null
         tts?.shutdown(); tts = null; ttsReady = false
         pool.release()
     }
