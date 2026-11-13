@@ -48,6 +48,7 @@ Kissen auf den Dächern und einer niedrigen Stufe. Die Katze kratzt, klettert, s
 Ein Tipp auf eine Höhle öffnet das Zimmer: ein Wohnzimmer mit Kamin, Schaukelstuhl und Fischbild, ein Schlafzimmer mit Bett, Duftspender und Nachtfenster.
 Die Zimmer sind in Perspektive gezeichnet, die Fenster zeigen die echte Tageszeit (Sonne, Dämmerung, Mond und Sterne) mit kleinen Ereignissen (Vögel, Schmetterling, Glühwürmchen, Eule, Sternschnuppe).
 Vieles reagiert auf Antippen: Kamin (Funken), Fischbild, Schaukelstuhl, Bettdecke, Duftspender (lockt die Katze an), Lampen, Kuckucksuhr, Kerze, Pflanzen, Bücher, Kissen, Bilder, Teppich, Fenster.
+Eine Aufzieh-Maus (Wohnzimmer) und ein Hüpfball (Schlafzimmer) sowie der Duftspender locken die Katze in den Raum, auch wenn sie gerade woanders ist.
 Dazu gibt es echte Miau-Aufnahmen, abhängig vom Alter der Katze.
 
 ## Dev-Version

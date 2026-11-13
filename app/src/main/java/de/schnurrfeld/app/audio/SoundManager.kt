@@ -15,7 +15,7 @@ enum class Sfx(val res: Int) {
     SUCCESS_4(R.raw.success_4), SUCCESS_5(R.raw.success_5),
     WIN(R.raw.win), JOKER(R.raw.joker), TAP(R.raw.tap),
     FILL(R.raw.fill), PRIZE(R.raw.prize), SLAM(R.raw.slam),
-    PURR(R.raw.purr), COIN(R.raw.coin), CRANK(R.raw.crank), NOM(R.raw.nom), SCRATCH(R.raw.scratch),
+    PURR(R.raw.purr), COIN(R.raw.coin), CRANK(R.raw.crank), NOM(R.raw.nom),
     // real recordings: kitten calls (high) and a bigger cat (lower)
     MEOW_KITTEN_1(R.raw.meow_kitten_1), MEOW_KITTEN_2(R.raw.meow_kitten_2), MEOW_KITTEN_3(R.raw.meow_kitten_3),
     MEOW_KITTEN_4(R.raw.meow_kitten_4), MEOW_KITTEN_5(R.raw.meow_kitten_5), MEOW_KITTEN_LONG(R.raw.meow_kitten_long),

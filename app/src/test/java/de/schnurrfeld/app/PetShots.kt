@@ -153,6 +153,11 @@ class PetShots {
     @Test fun roomBedSleeping() = room("room_bed_sleep", 2, "homeB", breed = Breed.WOLKE)
     @Test fun roomBedNight() = room("room_bed_night", 2, "homeB", breed = Breed.MOPPEL, hour = 23.5f, fx = mapOf("blanket" to 1500L, "pillow" to 500L, "pictures" to 600L))
     @Test fun roomBedDiffuser() = room("room_bed_diffuser", 2, "homeB", breed = Breed.MITTERNACHT, hour = 21f, fx = mapOf("diffuser" to 3500L, "mug" to 1000L, "window" to 500L))
+    @Test fun roomLivingMouse() = room("room_living_mouse", 1, "homeA", breed = Breed.MOPPEL, hour = 15f, fx = mapOf("toy" to 300L))
+    @Test fun roomLivingMouseBack() = room("room_living_mouse2", 1, "homeA", breed = Breed.MITTERNACHT, hour = 15f, fx = mapOf("toy" to 3000L))
+    @Test fun roomBedBall() = room("room_bed_ball", 2, "homeB", breed = Breed.WOLKE, hour = 20f, fx = mapOf("toy" to 300L))
+    @Test fun roomBedBallRoll() = room("room_bed_ball2", 2, "homeB", breed = Breed.KARAMELL, hour = 20f, fx = mapOf("toy" to 3800L))
+    @Test fun roomFishSwims() = room("room_fish", 1, null, hour = 15f, fx = mapOf("fish" to 600L))
     @Test fun roomLivingDark() = room("room_living_dark", 1, "homeA", dark = true, breed = Breed.MITTERNACHT, hour = 21f)
 
     /** taps into the room like a player would, then waits for the effects to play */
@@ -175,7 +180,7 @@ class PetShots {
     // living room: fire, fish picture, clock, candle, plant, window, lamp (off), chair, bookshelf, rug, floor plant, cat
     @Test fun tapLivingRoom() = tapRoom("tap_living", 1, listOf(0.43f to 0.25f, 0.43f to 0.17f, 0.685f to 0.115f, 0.33f to 0.24f, 0.53f to 0.25f, 0.685f to 0.3f, 0.885f to 0.5f, 0.64f to 0.8f, 0.1f to 0.4f, 0.3f to 0.9f, 0.07f to 0.7f), 21f, 700, pose = "homeA")
     @Test fun tapFire() = tapRoom("tap_fire", 1, listOf(0.43f to 0.5f), 20f, 800, pose = "homeA")
-    @Test fun tapBedroom() = tapRoom("tap_bed", 2, listOf(0.4f to 0.6f, 0.693f to 0.5f, 0.65f to 0.48f, 0.69f to 0.26f, 0.25f to 0.15f, 0.15f to 0.5f, 0.735f to 0.51f, 0.87f to 0.5f, 0.17f to 0.84f, 0.5f to 0.9f, 0.93f to 0.7f), 23f, 900, pose = "homeB")
+    @Test fun tapBedroom() = tapRoom("tap_bed", 2, listOf(0.4f to 0.6f, 0.693f to 0.5f, 0.65f to 0.48f, 0.69f to 0.26f, 0.25f to 0.15f, 0.15f to 0.5f, 0.735f to 0.51f, 0.87f to 0.5f, 0.76f to 0.89f, 0.5f to 0.9f, 0.93f to 0.7f), 23f, 900, pose = "homeB")
     @Test fun tapDiffuser() = tapRoom("tap_diffuser", 2, listOf(0.693f to 0.5f), 22f, 3500, pose = "homeB")
 
     @Test fun stage4Dark() = basket("pet_stage4_wolke_dark", 4, "B".repeat(45), dark = true)
