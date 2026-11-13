@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -83,7 +84,7 @@ import de.schnurrfeld.app.ui.components.drawBedBack
 import de.schnurrfeld.app.ui.components.Spot
 import de.schnurrfeld.app.ui.components.Tree
 import de.schnurrfeld.app.ui.components.drawClimbingTree
-import de.schnurrfeld.app.ui.components.drawTailPeek
+import de.schnurrfeld.app.ui.components.drawSky
 import de.schnurrfeld.app.ui.components.drawBedBlanket
 import de.schnurrfeld.app.ui.components.drawBedFront
 import de.schnurrfeld.app.ui.components.drawTailOverRim
@@ -248,8 +249,6 @@ class PetSim(seed: Long = System.nanoTime()) {
     var spot: Spot? = null; private set
     /** 0 = outside, 1 / 2 = at home in that cave (not visible) */
     var inside = 0; private set
-    /** a tail sticks out of the cave while the cat is at home (only sometimes) */
-    var peekTail = false; private set
     /** 0 = fully visible .. 1 = gone through the doorway (while entering / leaving) */
     var doorK = 0f; private set
     private var doorStart = 0L; private var doorHome = 0
@@ -287,7 +286,11 @@ class PetSim(seed: Long = System.nanoTime()) {
     val wantsPurr get() = petting || (act == Act.BRUSH && actPhase == 1)
 
     fun startHatch() { hatching = true; jumpStart = -2L }
-    fun feed(care: Care) { flights += Flight(care, -1L); pending = care }
+    fun feed(care: Care) {
+        flights += Flight(care, -1L); pending = care
+        // something to eat or play with: the cat drops its plan to climb or scratch and turns to the new item
+        if (mode == Mode.GO || mode == Mode.SCRATCH_WALK) { mode = Mode.IDLE; until = 0L }
+    }
 
     /** spawns a heart (at most every 220 ms); returns true if one was spawned */
     fun heart(x: Float, y: Float, now: Long): Boolean {
@@ -368,11 +371,11 @@ class PetSim(seed: Long = System.nanoTime()) {
         // the doorway animation runs on its own
         if (mode == Mode.ENTER) {
             doorK = ((now - doorStart) / 700f).coerceIn(0f, 1f); anim = CatAnim.WALK
-            if (doorK >= 1f) { inside = doorHome; mode = Mode.INSIDE; until = now + 20_000 + rnd.nextLong(40_000); peekTail = rnd.nextFloat() < 0.3f }
+            if (doorK >= 1f) { inside = doorHome; mode = Mode.INSIDE; until = now + 20_000 + rnd.nextLong(40_000) }
         } else if (mode == Mode.LEAVE) {
             doorK = 1f - ((now - doorStart) / 700f).coerceIn(0f, 1f); anim = CatAnim.WALK
             if (doorK <= 0f) {
-                inside = 0; peekTail = false; goSleep = false
+                inside = 0; goSleep = false
                 if (spot != null) { mode = Mode.REST; until = now + 2500; restAnimUntil = 0L } else { mode = Mode.IDLE; until = now + 1500 }
             }
         }
@@ -465,7 +468,7 @@ class PetSim(seed: Long = System.nanoTime()) {
             }
             else -> {}
         }
-        if (now < until) return
+        if (now < until || pending != null) return          // (an item is on its way: no new plans)
         val r = rnd.nextFloat()
         if (mood == de.schnurrfeld.app.data.Mood.SAD) {
             // sad: mostly sits there, looking around for you; no dancing
@@ -496,7 +499,7 @@ class PetSim(seed: Long = System.nanoTime()) {
         }
     }
 
-    /** for tests and screenshots: put the cat straight into a pose ("scratch", "roofA", "roofB", "step", "homeA", "homeB", "peekA", "peekB") */
+    /** for tests and screenshots: put the cat straight into a pose ("scratch", "roofA", "roofB", "step", "homeA", "homeB") */
     internal fun debugPose(pose: String, now: Long) {
         val far = now + 600_000
         when (pose) {
@@ -505,9 +508,9 @@ class PetSim(seed: Long = System.nanoTime()) {
                 val s = when (pose) { "roofA" -> Spot.ROOF_A; "roofB" -> Spot.ROOF_B; "doorB" -> Spot.DOOR_B; else -> Spot.STEP }
                 spot = s; x = s.x; mode = Mode.REST; goSleep = false; restAnim = CatAnim.LOOK; restAnimUntil = far; until = far
             }
-            "homeA", "homeB", "peekA", "peekB" -> {
+            "homeA", "homeB" -> {
                 val home = if (pose.endsWith("A")) 1 else 2
-                spot = Tree.spotAt(home); x = Tree.doorX(home); inside = home; doorK = 1f; mode = Mode.INSIDE; until = far; peekTail = pose.startsWith("peek")
+                spot = Tree.spotAt(home); x = Tree.doorX(home); inside = home; doorK = 1f; mode = Mode.INSIDE; until = far
             }
         }
     }
@@ -627,7 +630,7 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier, onRoom
                 while (sim.sounds.isNotEmpty()) {
                     val sfx = sim.sounds.removeAt(0)
                     if (!settings.sound) continue
-                    if (sfx.isMeow) app.sound.play(sfx, 0.9f, meowRate(sfx, sim.stage)) else app.sound.play(sfx, 0.8f)
+                    if (sfx.isMeow) app.sound.play(sfx, 0.28f, meowRate(sfx, sim.stage)) else app.sound.play(sfx, 0.8f)
                 }
                 if (sim.wantsPurr && purr == 0 && settings.sound) purr = app.sound.loop(Sfx.PURR, if (stage < PetRules.HATCH_STAGE) 0.5f else 0.85f)
                 if (!sim.wantsPurr && purr != 0) { app.sound.stop(purr); purr = 0 }
@@ -687,8 +690,10 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier, onRoom
         // ---- room
         drawRect(Brush.verticalGradient(if (dark) listOf(Color(0xFF2B2631), Color(0xFF241F29)) else listOf(Color(0xFFF7ECDD), Color(0xFFEFDDC6)), 0f, horizon), size = Size(w, horizon))
         val win = Offset(w * 0.22f, h * 0.2f); val ww = w * 0.22f
-        drawRoundRect(if (dark) Color(0xFF39425E) else Color(0xFFCFE7F7), Offset(win.x - ww / 2, win.y - ww / 2), Size(ww, ww), androidx.compose.ui.geometry.CornerRadius(ww * 0.12f))
-        drawCircle(if (dark) Color(0xFFF4EBC6) else Color(0xFFFFE08A), ww * 0.14f, Offset(win.x + ww * 0.18f, win.y - ww * 0.16f))
+        // the sky outside follows the real time of day
+        clipPath(androidx.compose.ui.graphics.Path().apply {
+            addRoundRect(androidx.compose.ui.geometry.RoundRect(androidx.compose.ui.geometry.Rect(Offset(win.x - ww / 2, win.y - ww / 2), Size(ww, ww)), androidx.compose.ui.geometry.CornerRadius(ww * 0.12f)))
+        }) { drawSky(androidx.compose.ui.geometry.Rect(Offset(win.x - ww / 2, win.y - ww / 2), Size(ww, ww)), t, 0) }
         val bar = if (dark) Color(0xFF4A4458) else Color.White
         drawLine(bar, Offset(win.x, win.y - ww / 2), Offset(win.x, win.y + ww / 2), ww * 0.05f)
         drawLine(bar, Offset(win.x - ww / 2, win.y), Offset(win.x + ww / 2, win.y), ww * 0.05f)
@@ -774,8 +779,7 @@ private fun PetScene(app: App, pet: Pet, sim: PetSim, modifier: Modifier, onRoom
             } else {
                 val feet = sim.spot?.let { it.feetY * h } ?: ground
                 if (sim.inside != 0) {
-                    // at home: not in view – only now and then a tail sticks out of the doorway
-                    if (sim.peekTail) drawTailPeek(w, h, sim.inside, look?.tail ?: fur.base, look?.tailShade ?: fur.shade, t)
+                    // at home: not in view
                 } else if (sim.doorK > 0f) {
                     // walking through the doorway: fades and shrinks a little
                     val sc = 1f - 0.2f * sim.doorK

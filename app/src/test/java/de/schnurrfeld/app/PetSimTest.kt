@@ -120,8 +120,8 @@ class PetSimTest {
         assertTrue("cat is at the bowl or done", sim.act == Act.NONE || abs(sim.x - sim.itemX) < 0.05f)
     }
 
-    @Test fun catsDisappearIntoTheCavesAndSometimesShowTheirTail() {
-        var seenA = false; var seenB = false; var peeked = false; var hiddenNoTail = false
+    @Test fun catsDisappearIntoTheCaves() {
+        var seenA = false; var seenB = false
         for (seed in 1L..6L) {
             val sim = PetSim(seed).apply { stage = 6 }
             var t = 1000L
@@ -130,14 +130,10 @@ class PetSimTest {
                 t += 16; sim.step(t, 0.6f)
                 if (sim.inside == 1) seenA = true
                 if (sim.inside == 2) seenB = true
-                if (sim.inside != 0 && sim.peekTail) peeked = true
-                if (sim.inside != 0 && !sim.peekTail) hiddenNoTail = true
             }
         }
         assertTrue("goes home to cave A", seenA)
         assertTrue("goes home to cave B", seenB)
-        assertTrue("sometimes a tail sticks out", peeked)
-        assertTrue("but not always", hiddenNoTail)
     }
 
     @Test fun foodMakesACatComeOutOfItsCave() {
@@ -167,5 +163,21 @@ class PetSimTest {
         t = run(sim, t, 300)
         assertEquals(1f, sim.doorK, 0.001f)
         assertEquals(1, sim.inside)
+    }
+
+    /** whatever the cat was about to do (climb, scratch, go home): a new item always gets its attention within a few seconds */
+    @Test fun anItemAlwaysGetsTheCatsAttention() {
+        for (care in listOf(Care.BRUSH, Care.FOOD, Care.YARN, Care.MILK)) {
+            for (seed in 1L..120L) {
+                val sim = PetSim(seed).apply { stage = 6 }
+                var t = 1000L
+                repeat(19) { t += 16; sim.step(t, 0.6f) }
+                sim.feed(care)
+                var started = false
+                val end = t + 4000
+                while (t < end) { t += 16; sim.step(t, 0.6f); if (sim.act != Act.NONE && sim.actPhase() >= 1) started = true }
+                assertTrue("seed $seed, $care: the cat turned to the item", started)
+            }
+        }
     }
 }

@@ -95,7 +95,7 @@ fun DrawScope.drawClimbingTree(w: Float, h: Float, t: Float, dark: Boolean, rake
     drawRoundRect(cushionEdge, Offset(fx(Tree.POST_X) - u * 8f, postTop - u * 2.2f), Size(u * 16f, u * 3.4f), CornerRadius(u * 1.7f), style = Stroke(u * 0.4f))
     // toy on a string
     val sway = sin(t * 1.9f) * u * 1.6f
-    val tx = fx(Tree.POST_X) + u * 5.5f
+    val tx = fx(Tree.POST_X) - u * 5.5f
     val tEnd = Offset(tx + sway, postTop + u * 14f)
     drawLine(if (dark) Color(0xFFBDB4C4) else Color(0xFF8A7F99), Offset(tx, postTop + u * 1f), tEnd, u * 0.4f, StrokeCap.Round)
     drawCircle(Color(0xFFF28CA0), u * 2.8f, Offset(tEnd.x, tEnd.y + u * 2.2f))
@@ -144,13 +144,7 @@ private fun DrawScope.cave(box: FRect, w: Float, h: Float, u: Float, dark: Boole
     }
     drawPath(arch, Brush.radialGradient(listOf(Color(0xFFFFD08A), Color(0xFFC98A52), Color(0xFF4A2F35)), Offset(cx, b - ah * 0.2f), aw * 0.95f))
     clipPath(arch) {
-        // a hint of the home behind the door: back wall line, a tiny picture, a warm lamp
-        drawRect(Color(0xFF3B2A2A), Offset(ax, b - ah * 0.17f), Size(aw, ah * 0.17f), alpha = 0.55f)
-        drawRoundRect(Color(0xFFF5E6C8), Offset(cx - aw * 0.27f, ay + ah * 0.30f), Size(aw * 0.17f, aw * 0.14f), CornerRadius(u * 0.5f), alpha = 0.85f)
-        drawRoundRect(Color(0xFF8A5A44), Offset(cx - aw * 0.27f, ay + ah * 0.30f), Size(aw * 0.17f, aw * 0.14f), CornerRadius(u * 0.5f), style = Stroke(u * 0.35f))
-        drawCircle(Color(0xFFFFF3C4), aw * 0.07f, Offset(cx + aw * 0.22f, ay + ah * 0.42f), alpha = 0.9f)
-        drawLine(Color(0xFF5A3A3A), Offset(cx + aw * 0.22f, ay + ah * 0.46f), Offset(cx + aw * 0.22f, b - ah * 0.12f), u * 0.5f)
-        if (isA) drawOval(Color(0xFFFF9B4A), Offset(cx - aw * 0.12f, b - ah * 0.27f), Size(aw * 0.24f, ah * 0.16f), alpha = 0.55f + 0.2f * sin(t * 7f))   // fire glow
+        if (isA) previewLiving(ax, ay, aw, ah, b, u, t, dark) else previewBedroom(ax, ay, aw, ah, b, u, t, dark)
     }
     drawPath(arch, edge, style = Stroke(u * 0.9f))
     // the upper cave has a ledge in front of its door (the lower one stands on the floor)
@@ -175,16 +169,65 @@ private fun Color.compositeOverSafe(bg: Color): Color {
     return Color((red * alpha + bg.red * bg.alpha * (1f - alpha)) / a, (green * alpha + bg.green * bg.alpha * (1f - alpha)) / a, (blue * alpha + bg.blue * bg.alpha * (1f - alpha)) / a, a)
 }
 
-/** A tail sticking out of a doorway (the cat is at home and cannot resist), swaying a little. */
-fun DrawScope.drawTailPeek(w: Float, h: Float, home: Int, base: Color, shade: Color, t: Float) {
-    val u = w / 100f
-    val bx = Tree.doorX(home) * w - Tree.ARCH_W * w * 0.12f
-    val by = Tree.doorBottom(home) * h - u * 0.6f
-    val sway = sin(t * 2.3f)
-    val tail = Path().apply {
-        moveTo(bx, by - u * 1f)
-        cubicTo(bx - u * 5f, by - u * 3f, bx - u * 8f + sway * u * 2f, by - u * 9f, bx - u * 4f + sway * u * 3f, by - u * 15f - u * 2f * (1f + sway) / 2f)
+
+/** What you see of the living room through the lower doorway: the fireplace in the distance, a bit of rug and chair. */
+private fun DrawScope.previewLiving(ax: Float, ay: Float, aw: Float, ah: Float, b: Float, u: Float, t: Float, dark: Boolean) {
+    val cx = ax + aw / 2
+    drawRect(Brush.verticalGradient(listOf(Color(0xFFF4D8AE), Color(0xFFE3B67F)), ay, b), Offset(ax, ay), Size(aw, ah))
+    // floor
+    drawRect(Brush.verticalGradient(listOf(Color(0xFFC99A66), Color(0xFFB07F4E)), b - ah * 0.2f, b), Offset(ax, b - ah * 0.2f), Size(aw, ah * 0.2f))
+    drawRect(Color(0xFFF7EBD9), Offset(ax, b - ah * 0.215f), Size(aw, ah * 0.02f))
+    // fireplace
+    val fw = aw * 0.46f; val ft = b - ah * 0.60f; val fb = b - ah * 0.2f
+    drawRect(Color(0xFFC77D63), Offset(cx - fw / 2, ft), Size(fw, fb - ft))
+    for (r in 1..5) drawLine(Color(0xFFA9604A), Offset(cx - fw / 2, ft + (fb - ft) * r / 6f), Offset(cx + fw / 2, ft + (fb - ft) * r / 6f), u * 0.25f, alpha = 0.8f)
+    drawRect(Color(0xFFA9774A), Offset(cx - fw * 0.62f, ft - ah * 0.03f), Size(fw * 1.24f, ah * 0.045f))
+    val ow = fw * 0.5f; val ot = ft + (fb - ft) * 0.38f
+    val open = Path().apply { moveTo(cx - ow / 2, fb); lineTo(cx - ow / 2, ot + ow * 0.3f); arcTo(Rect(cx - ow / 2, ot, cx + ow / 2, ot + ow * 0.6f), 180f, 180f, false); lineTo(cx + ow / 2, fb); close() }
+    drawPath(open, Color(0xFF2A1A1A))
+    clipPath(open) {
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xFFFF8A3C).copy(alpha = 0.6f)), ot, fb), Offset(cx - ow / 2, ot), Size(ow, fb - ot))
+        for (i in 0..2) {
+            val fx = cx - ow * 0.28f + i * ow * 0.28f
+            val fh = (fb - ot) * (0.55f + 0.1f * sin(t * 2.2f + i * 2f))
+            val fl = Path().apply { moveTo(fx - ow * 0.12f, fb); quadraticTo(fx, fb - fh * 0.55f, fx + sin(t * 1.6f + i) * ow * 0.04f, fb - fh); quadraticTo(fx + ow * 0.06f, fb - fh * 0.4f, fx + ow * 0.12f, fb); close() }
+            drawPath(fl, Color(0xFFFF7A2F)); drawCircle(Color(0xFFFFD66B), ow * 0.05f, Offset(fx, fb - fh * 0.25f))
+        }
     }
-    drawPath(tail, shade, style = Stroke(u * 4.4f, cap = StrokeCap.Round))
-    drawPath(tail, base, style = Stroke(u * 3.1f, cap = StrokeCap.Round))
+    // a little picture over the mantel
+    drawRect(Color(0xFF8A5A44), Offset(cx - aw * 0.1f, ft - ah * 0.2f), Size(aw * 0.2f, ah * 0.14f))
+    drawRect(Color(0xFF9CD3E8), Offset(cx - aw * 0.085f, ft - ah * 0.185f), Size(aw * 0.17f, ah * 0.11f))
+    drawOval(Color(0xFFFF8F5A), Offset(cx - aw * 0.045f, ft - ah * 0.15f), Size(aw * 0.08f, ah * 0.05f))
+    // rug and the runner of the rocking chair
+    drawOval(Color(0xFFE8A2B6), Offset(ax + aw * 0.05f, b - ah * 0.11f), Size(aw * 0.9f, ah * 0.2f))
+    drawPath(Path().apply { moveTo(ax + aw * 0.72f, b - ah * 0.08f); quadraticTo(ax + aw * 0.85f, b - ah * 0.015f, ax + aw * 1.0f, b - ah * 0.08f) }, Color(0xFF8A5E3A), style = Stroke(u * 0.9f, cap = StrokeCap.Round))
+    if (dark) drawRect(Color.Black, Offset(ax, ay), Size(aw, ah), alpha = 0.22f)
+    drawRect(Brush.radialGradient(listOf(Color(0xFFFF9B4A).copy(alpha = 0.2f), Color.Transparent), Offset(cx, fb), aw * 0.8f), Offset(ax, ay), Size(aw, ah))
+}
+
+/** What you see of the bedroom through the upper doorway: the foot of the bed, the nightstand with its lamp, a window. */
+private fun DrawScope.previewBedroom(ax: Float, ay: Float, aw: Float, ah: Float, b: Float, u: Float, t: Float, dark: Boolean) {
+    drawRect(Brush.verticalGradient(listOf(Color(0xFFDDE0F5), Color(0xFFC7CCEA)), ay, b), Offset(ax, ay), Size(aw, ah))
+    drawRect(Brush.verticalGradient(listOf(Color(0xFFD2A878), Color(0xFFB98B5C)), b - ah * 0.2f, b), Offset(ax, b - ah * 0.2f), Size(aw, ah * 0.2f))
+    drawRect(Color(0xFFF7EBD9), Offset(ax, b - ah * 0.215f), Size(aw, ah * 0.02f))
+    // round window with the real sky
+    val wc = Offset(ax + aw * 0.33f, ay + ah * 0.42f); val wr = aw * 0.12f
+    drawCircle(Color(0xFF8A5E3A), wr + u * 0.5f, wc)
+    clipPath(Path().apply { addOval(Rect(wc.x - wr, wc.y - wr, wc.x + wr, wc.y + wr)) }) { drawSky(Rect(wc.x - wr, wc.y - wr, wc.x + wr, wc.y + wr), t, 2) }
+    // bed: footboard, blanket and a pillow
+    val bl = ax + aw * 0.03f; val bw = aw * 0.56f
+    drawRect(Color(0xFFB59BE0), Offset(bl + bw * 0.04f, b - ah * 0.46f), Size(bw * 0.92f, ah * 0.2f))
+    for (i in 0..4) drawRect(Color.White, Offset(bl + bw * (0.1f + i * 0.18f), b - ah * 0.46f), Size(bw * 0.07f, ah * 0.2f), alpha = 0.25f)
+    drawRoundRect(Color.White, Offset(bl + bw * 0.1f, b - ah * 0.52f), Size(bw * 0.4f, ah * 0.08f), CornerRadius(u * 1.2f))
+    drawRoundRect(Color(0xFF8A5E3A), Offset(bl, b - ah * 0.3f), Size(bw, ah * 0.2f), CornerRadius(u * 0.8f))
+    drawRect(Color(0xFFA9774A), Offset(bl + bw * 0.04f, b - ah * 0.27f), Size(bw * 0.92f, ah * 0.05f), alpha = 0.6f)
+    // nightstand with a warm lamp
+    val nx = ax + aw * 0.68f; val nw = aw * 0.27f
+    drawRect(Color(0xFFA9774A), Offset(nx, b - ah * 0.34f), Size(nw, ah * 0.28f))
+    drawRect(Color(0xFF8A5E3A), Offset(nx + nw * 0.1f, b - ah * 0.2f), Size(nw * 0.8f, u * 0.4f))
+    val lamp = Offset(nx + nw * 0.5f, b - ah * 0.5f)
+    drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE9A8).copy(alpha = 0.55f), Color.Transparent), lamp, aw * 0.5f), aw * 0.5f, lamp)
+    drawLine(Color(0xFF5B4A3B), Offset(lamp.x, lamp.y + ah * 0.04f), Offset(lamp.x, b - ah * 0.34f), u * 0.6f)
+    drawPath(Path().apply { moveTo(lamp.x - nw * 0.3f, lamp.y + ah * 0.04f); lineTo(lamp.x - nw * 0.17f, lamp.y - ah * 0.06f); lineTo(lamp.x + nw * 0.17f, lamp.y - ah * 0.06f); lineTo(lamp.x + nw * 0.3f, lamp.y + ah * 0.04f); close() }, Color(0xFFFFE9B8))
+    if (dark) drawRect(Color.Black, Offset(ax, ay), Size(aw, ah), alpha = 0.2f)
 }
