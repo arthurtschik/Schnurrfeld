@@ -62,15 +62,14 @@ class PetSimTest {
     @Test fun grownCatsUseTheScratchingPost() {
         val sim = PetSim(seed = 11).apply { stage = 6 }
         var t = 1000L
-        var scratched = false; var climbed = false; var scratchSounds = 0
+        var scratched = false; var climbed = false
         val end = t + 15 * 60_000L          // 15 minutes of cat life
         while (t < end) {
             t += 16; sim.step(t, 0.6f)
             if (sim.scratching) scratched = true
             if (sim.spot != null) climbed = true
-            while (sim.sounds.isNotEmpty()) if (sim.sounds.removeAt(0) == de.schnurrfeld.app.audio.Sfx.SCRATCH) scratchSounds++
         }
-        assertTrue("scratches the post", scratched && scratchSounds > 0)
+        assertTrue("scratches the post", scratched)
         assertTrue("climbs up to the top cushion", climbed)
     }
 
@@ -179,5 +178,43 @@ class PetSimTest {
                 assertTrue("seed $seed, $care: the cat turned to the item", started)
             }
         }
+    }
+
+    /** a toy or the scent in a room calls the cat there – wherever it is and whatever it is doing */
+    @Test fun toysCallTheCatIntoTheRoom() {
+        for (home in 1..2) for (start in listOf("none", "scratch", "roofA", "roofB", "step", "homeA", "homeB")) for (seed in 1L..6L) {
+            val sim = PetSim(seed).apply { stage = 6 }
+            var t = run(sim, 1000, 300)
+            if (start != "none") sim.debugPose(start, t)
+            t = run(sim, t, 300)
+            sim.lure(home, t)
+            var there = sim.inside == home
+            val end = t + 45_000
+            while (t < end && !there) { t += 16; sim.step(t, 0.6f); there = sim.inside == home }
+            assertTrue("start=$start seed=$seed home=$home: the cat came", there)
+        }
+    }
+
+    @Test fun aSadCatAlsoComesForAToyAndStays() {
+        val sim = PetSim(seed = 8).apply { stage = 6; mood = de.schnurrfeld.app.data.Mood.SAD }
+        var t = run(sim, 1000, 300)
+        sim.lure(2, t)
+        val end = t + 45_000
+        var there = false
+        while (t < end && !there) { t += 16; sim.step(t, 0.6f); there = sim.inside == 2 }
+        assertTrue("came although sad", there)
+        t = run(sim, t, 3000)
+        assertEquals("stays a while", 2, sim.inside)
+    }
+
+    @Test fun lureIsIgnoredForYoungCatsAndWhenAlreadyThere() {
+        val young = PetSim(seed = 1).apply { stage = 4 }
+        young.lure(1, 1000)
+        assertEquals(0, young.headingHome)
+        val sim = PetSim(seed = 1).apply { stage = 6 }
+        val t = run(sim, 1000, 300)
+        sim.debugPose("homeA", t)
+        sim.lure(1, t)
+        assertEquals(0, sim.headingHome)
     }
 }

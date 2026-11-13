@@ -18,6 +18,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -58,6 +60,7 @@ import de.schnurrfeld.app.ui.theme.LocalDark
 import androidx.compose.ui.geometry.lerp as lerpOffset
 import androidx.compose.ui.graphics.lerp as lerpColor
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -75,7 +78,13 @@ fun RoomOverlay(app: App, pet: Pet, sim: PetSim, home: Int, startFx: Map<String,
     val fur = furOf(breed)
     BackHandler(onBack = onClose)
     val catHere by remember { derivedStateOf { frame.value; sim.inside == home } }
+    val coming by remember { derivedStateOf { frame.value; sim.headingHome == home } }
     val name = breed.title
+    // when the cat comes home while the room is open it walks in
+    var arriveAt by remember { mutableLongStateOf(-1L) }
+    var wasHere by remember { mutableStateOf(catHere) }
+    LaunchedEffect(catHere) { if (catHere && !wasHere) arriveAt = frame.value; wasHere = catHere }
+    fun phaseNow(): Int = if (arriveAt > 0 && frame.value - arriveAt < 14_000L) 1 else ((frame.value / 14_000L) % 2L).toInt()
     val starts = remember { HashMap<String, Long>() }
     val lampOn = remember { mutableStateOf(true) }
     val taps = remember { mutableIntStateOf(0) }
@@ -84,15 +93,18 @@ fun RoomOverlay(app: App, pet: Pet, sim: PetSim, home: Int, startFx: Map<String,
     fun trigger(key: String) {
         starts[key] = frame.value
         taps.intValue++
+        // the scent and the toys call the cat into this room
+        if (key == "diffuser" || key == "toy") sim.lure(home, android.os.SystemClock.uptimeMillis())
         if (key == "lamp") lampOn.value = !lampOn.value
         if (!app.store.settings.sound) return
         when (key) {
-            "fire" -> app.sound.play(Sfx.SCRATCH, 0.35f, 1.6f)
+            "fire" -> {}
             "fish" -> app.sound.play(Sfx.PLOP, 0.7f, 1.1f)
             "clock" -> app.sound.play(Sfx.COIN, 0.5f)
             "candle" -> app.sound.play(Sfx.ERASE, 0.6f)
             "window" -> app.sound.play(Sfx.SUCCESS_1, 0.4f)
             "diffuser" -> app.sound.play(Sfx.SUCCESS_3, 0.35f, 1.2f)
+            "toy" -> if (home == 1) app.sound.play(Sfx.PLOP, 0.7f, 1.9f) else app.sound.play(Sfx.COIN, 0.5f, 1.3f)
             "blanket" -> app.sound.play(Sfx.CRANK, 0.4f, 1.3f)
             "cat" -> { val m = meowFor(6, false); app.sound.play(m, 0.28f, meowRate(m, 6)) }
             else -> app.sound.play(Sfx.TAP, 0.6f, 0.9f + noise(taps.intValue) * 0.3f)
@@ -107,7 +119,7 @@ fun RoomOverlay(app: App, pet: Pet, sim: PetSim, home: Int, startFx: Map<String,
                     detectTapGestures { pos ->
                         val g = Geo(size.width.toFloat(), size.height.toFloat())
                         val spots = if (home == 1) livingSpots(g) else bedroomSpots(g)
-                        val hit = (if (catHere) listOf(Hot("cat", catRect(g, home, ((frame.value / 14_000L) % 2L).toInt()))) else emptyList()) + spots
+                        val hit = (if (catHere) listOf(Hot("cat", catRect(g, home, phaseNow()))) else emptyList()) + spots
                         hit.firstOrNull { it.rect.contains(pos) }?.let { trigger(it.key) }
                     }
                 }
@@ -116,12 +128,13 @@ fun RoomOverlay(app: App, pet: Pet, sim: PetSim, home: Int, startFx: Map<String,
                 val g = Geo(size.width, size.height)
                 val fx = Fx(starts, frame.value)
                 val night = Sky.night(Sky.hour())
-                val resident = if (catHere) Resident(fur, breed, ((frame.value / 14_000L) % 2L).toInt()) else null
+                val sinceArrive = if (arriveAt > 0) frame.value - arriveAt else Long.MAX_VALUE
+                val resident = if (catHere) Resident(fur, breed, phaseNow(), (sinceArrive / 1600f).coerceIn(0f, 1f)) else null
                 if (home == 1) drawLivingRoom(g, t, dark, fx, lampOn.value, night, resident, taps.intValue)
                 else drawBedroom(g, t, dark, fx, lampOn.value, night, resident)
             }
             Text(
-                if (catHere) "$name ist gerade zu Hause." else "Gerade ist niemand zu Hause.",
+                if (catHere) "$name ist gerade zu Hause." else if (coming) "$name kommt gleich …" else "Gerade ist niemand zu Hause.",
                 style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             )
@@ -139,7 +152,7 @@ fun RoomOverlay(app: App, pet: Pet, sim: PetSim, home: Int, startFx: Map<String,
 
 // ============================================================================ helpers
 
-private class Resident(val fur: Fur, val breed: Breed, val phase: Int)
+private class Resident(val fur: Fur, val breed: Breed, val phase: Int, val arrive: Float)
 private class Hot(val key: String, val rect: Rect)
 
 /** running tap effects: progress 0..1 while an effect is active */
@@ -176,6 +189,53 @@ private fun DrawScope.heart(c: Offset, r: Float, a: Float) {
         cubicTo(c.x + r * 0.65f, c.y - r * 1.15f, c.x + r * 1.35f, c.y - r * 0.1f, c.x, c.y + r * 0.85f); close()
     }
     drawPath(p, Color(0xFFFF6F91), alpha = a.coerceIn(0f, 1f))
+}
+
+private fun ease(k: Float): Float { val x = k.coerceIn(0f, 1f); return x * x * (3f - 2f * x) }
+
+/** A wind-up toy mouse on little wheels with a golden key on its back. [feet] = where the wheels touch the floor. */
+private fun DrawScope.windUpMouse(feet: Offset, s: Float, facing: Float, t: Float, running: Boolean) {
+    scale(facing, 1f, pivot = feet) {
+        val bob = if (running) abs(sin(t * 18f)) * s * 0.05f else 0f
+        val c = Offset(feet.x, feet.y - s * 0.4f - bob)
+        drawOval(Color.Black, Offset(feet.x - s * 0.7f, feet.y - s * 0.06f), Size(s * 1.5f, s * 0.14f), alpha = 0.15f)
+        val wag = if (running) sin(t * 14f) * s * 0.12f else 0f
+        drawPath(Path().apply { moveTo(c.x - s * 0.6f, c.y + s * 0.1f); cubicTo(c.x - s * 0.95f, c.y + s * 0.1f + wag, c.x - s * 1.0f, c.y - s * 0.4f, c.x - s * 1.3f, c.y - s * 0.3f + wag) }, Color(0xFFE79DB3), style = Stroke(s * 0.07f, cap = StrokeCap.Round))
+        drawOval(Color(0xFF9AA0B5), Offset(c.x - s * 0.65f, c.y - s * 0.38f), Size(s * 1.3f, s * 0.8f))
+        drawOval(Color(0xFFC9CDDD), Offset(c.x - s * 0.45f, c.y - s * 0.02f), Size(s * 0.9f, s * 0.32f))
+        drawPath(Path().apply { moveTo(c.x + s * 0.4f, c.y - s * 0.24f); lineTo(c.x + s * 0.98f, c.y + s * 0.08f); lineTo(c.x + s * 0.4f, c.y + s * 0.3f); close() }, Color(0xFF9AA0B5))
+        drawCircle(Color(0xFFFF8FB0), s * 0.07f, Offset(c.x + s * 0.97f, c.y + s * 0.08f))
+        drawCircle(Color(0xFF9AA0B5), s * 0.24f, Offset(c.x + s * 0.25f, c.y - s * 0.42f)); drawCircle(Color(0xFFFFB3C7), s * 0.15f, Offset(c.x + s * 0.25f, c.y - s * 0.42f))
+        drawCircle(Color.White, s * 0.09f, Offset(c.x + s * 0.52f, c.y - s * 0.06f)); drawCircle(Color(0xFF2B2A33), s * 0.045f, Offset(c.x + s * 0.54f, c.y - s * 0.06f))
+        for (wx in listOf(-0.36f, 0.38f)) {
+            val wc = Offset(c.x + wx * s, feet.y - s * 0.16f)
+            drawCircle(Color(0xFF55506A), s * 0.17f, wc)
+            rotate(if (running) t * 500f * facing else 0f, pivot = wc) { for (k in 0..2) drawLine(Color(0xFFB9B4CF), Offset(wc.x - s * 0.13f, wc.y), Offset(wc.x + s * 0.13f, wc.y), s * 0.03f) }
+        }
+        val kc = Offset(c.x - s * 0.08f, c.y - s * 0.52f)
+        rotate(if (running) t * 260f else 25f, pivot = kc) {
+            drawLine(Color(0xFFE2B75A), Offset(kc.x, kc.y + s * 0.14f), kc, s * 0.05f, StrokeCap.Round)
+            drawCircle(Color(0xFFF1D79B), s * 0.1f, Offset(kc.x - s * 0.1f, kc.y)); drawCircle(Color(0xFFF1D79B), s * 0.1f, Offset(kc.x + s * 0.1f, kc.y))
+        }
+    }
+}
+
+/** A special bouncy ball: shiny, with a yellow star, glowing a bit. */
+private fun DrawScope.bounceBall(c: Offset, r: Float, spin: Float, glowing: Boolean) {
+    if (glowing) glow(c, r * 3f, 0.3f, Color(0xFFFFE27A))
+    drawCircle(Brush.radialGradient(listOf(Color(0xFFD2EEFF), Color(0xFF8E7FE0)), Offset(c.x - r * 0.3f, c.y - r * 0.35f), r * 1.5f), r, c)
+    rotate(spin, pivot = c) {
+        val star = Path().apply {
+            for (i in 0 until 10) {
+                val a = -PI.toFloat() / 2f + i * PI.toFloat() / 5f
+                val rr = if (i % 2 == 0) r * 0.62f else r * 0.27f
+                if (i == 0) moveTo(c.x + cos(a) * rr, c.y + sin(a) * rr) else lineTo(c.x + cos(a) * rr, c.y + sin(a) * rr)
+            }
+            close()
+        }
+        drawPath(star, Color(0xFFFFD84A))
+    }
+    drawCircle(Color.White, r * 0.17f, Offset(c.x - r * 0.42f, c.y - r * 0.45f), alpha = 0.7f)
 }
 
 /** a bump 0 -> 1 -> 0 over p in 0..1 */
@@ -332,6 +392,7 @@ private fun DrawScope.plantPot(base: Offset, s: Float, sway: Float, leafA: Color
 // ============================================================================ living room
 
 private fun livingSpots(g: Geo): List<Hot> = listOf(
+    Hot("toy", g.rect(0.15f, 0.82f, 0.31f, 0.93f)),
     Hot("clock", g.rect(0.65f, 0.085f, 0.72f, 0.15f)),
     Hot("candle", g.rect(0.31f, 0.19f, 0.36f, 0.30f)),
     Hot("plant", g.rect(0.49f, 0.2f, 0.565f, 0.30f)),
@@ -460,7 +521,8 @@ private fun DrawScope.drawLivingRoom(g: Geo, t: Float, dark: Boolean, fx: Fx, la
     }
     // the fish picture over the mantel: the fish swims away when tapped and a new one swims in
     val fishP = fx.p("fish", 2800)
-    val fishX = when { fishP == null -> 0.5f; fishP < 0.35f -> 0.5f + fishP / 0.35f * 0.7f; fishP < 0.6f -> 1.4f; else -> -0.4f + (fishP - 0.6f) / 0.4f * 0.9f }
+    // the fish faces left, so it swims off to the left and the new one comes in from the right
+    val fishX = when { fishP == null -> 0.5f; fishP < 0.35f -> 0.5f - fishP / 0.35f * 0.9f; fishP < 0.6f -> -0.5f; else -> 1.4f - (fishP - 0.6f) / 0.4f * 0.9f }
     pictureFrame(g.rect(0.355f, 0.095f, 0.505f, 0.245f), wood, 0f) { artFish(it, fishX, fishP?.takeIf { p -> p < 0.55f }, t) }
     // candle and plant on the mantel
     val cx0 = w * 0.335f; val cy0 = fT - h * 0.022f
@@ -494,14 +556,37 @@ private fun DrawScope.drawLivingRoom(g: Geo, t: Float, dark: Boolean, fx: Fx, la
     // rocking chair in profile: fully on the floor, in front of the wall
     val chairBase = Offset(w * 0.695f, fy + h * 0.215f)
     val u = h * 0.0026f
-    val sleeping = cat != null && cat.phase == 0
+    val toyP = fx.p("toy", 7000)
+    val sleeping = cat != null && cat.phase == 0 && toyP == null && cat.arrive >= 1f
     val swingA = swing(fx.p("chair", 3400), 13f, 20f) + sin(t * 1.4f) * (if (sleeping) 3.5f else 1.8f)
     val onChair: (DrawScope.(Offset) -> Unit)? = if (sleeping) { seat -> drawCatAt(seat, minOf(w, h * 0.8f) * 0.29f, cat!!, CatAnim.SLEEP, t, -1f) } else null
     rockingChair(chairBase, u, swingA, wood, woodDark, if (dark) Color(0xFF8E5D75) else Color(0xFFF2A9BC), onChair)
 
-    if (cat != null && cat.phase == 1) {
-        val anim = when { fx.p("fire", 3000) != null || fx.p("fish", 3000) != null -> CatAnim.LOOK; fx.p("cat", 2200) != null -> CatAnim.PURR; (t / 4f).toInt() % 2 == 0 -> CatAnim.LOOK; else -> CatAnim.WAG }
-        drawCatAt(g.floor(0.36f, 0.74f), minOf(w, h * 0.8f) * 0.3f, cat, anim, t, 1f)
+    // the wind-up mouse: tap it and it scurries across the floor and back (the cat comes to chase it)
+    val lane = fy + (h - fy) * 0.72f
+    val mouseRest = w * 0.22f; val mouseEnd = w * 0.8f
+    var mouseX = mouseRest; var mFace = 1f; var mMoving = false
+    if (toyP != null) when {
+        toyP < 0.45f -> { mouseX = mouseRest + (mouseEnd - mouseRest) * ease(toyP / 0.45f); mMoving = true }
+        toyP < 0.55f -> mouseX = mouseEnd
+        else -> { mouseX = mouseEnd - (mouseEnd - mouseRest) * ease((toyP - 0.55f) / 0.45f); mFace = -1f; mMoving = true }
+    }
+    windUpMouse(Offset(mouseX, lane), w * 0.085f, mFace, t, mMoving)
+
+    if (cat != null && !sleeping) {
+        val s = minOf(w, h * 0.8f) * 0.3f
+        val rest = g.floor(0.36f, 0.74f)
+        var pos = rest; var face = 1f
+        var anim = when { fx.p("fire", 3000) != null || fx.p("fish", 3000) != null -> CatAnim.LOOK; fx.p("cat", 2200) != null -> CatAnim.PURR; (t / 4f).toInt() % 2 == 0 -> CatAnim.LOOK; else -> CatAnim.WAG }
+        if (cat.arrive < 1f) {
+            pos = lerpOffset(Offset(-s * 0.7f, rest.y), rest, ease(cat.arrive)); anim = CatAnim.WALK
+        } else if (toyP != null) {
+            val follow = Offset((mouseX - mFace * s * 0.6f).coerceIn(s * 0.3f, w - s * 0.3f), lane + h * 0.02f)
+            val k = ease(toyP * 6f) * (1f - ease((toyP - 0.9f) * 10f))
+            pos = lerpOffset(rest, follow, k); face = mFace
+            anim = if (mMoving) CatAnim.WALK else if (toyP in 0.45f..0.55f) CatAnim.SWAT else CatAnim.LOOK
+        }
+        drawCatAt(pos, s, cat, anim, t, face)
     }
     fx.p("cat", 2200)?.let { p -> for (i in 0..2) heart(Offset(w * (0.3f + 0.07f * i) + sin(p * 8f + i) * 6f, h * 0.7f - p * h * 0.12f - i * 14f), w * 0.02f, 1f - p) }
 
@@ -558,7 +643,7 @@ private fun bedroomSpots(g: Geo): List<Hot> = listOf(
     Hot("pillow", g.rect(0.09f, 0.45f, 0.215f, 0.54f)),
     Hot("blanket", g.rect(0.2f, 0.5f, 0.58f, 0.68f)),
     Hot("wardrobe", g.rect(0.78f, 0.24f, 0.97f, 0.68f)),
-    Hot("slippers", g.rect(0.1f, 0.78f, 0.24f, 0.9f)),
+    Hot("toy", g.rect(0.72f, 0.83f, 0.81f, 0.93f)),
     Hot("fern", g.rect(0.84f, 0.5f, 1.0f, 0.86f)),
     Hot("rug", g.rect(0.22f, 0.72f, 0.66f, 0.97f)),
 )
@@ -618,17 +703,9 @@ private fun DrawScope.drawBedroom(g: Geo, t: Float, dark: Boolean, fx: Fx, lampO
     for (lx in listOf(wx0 + 4f, wx1 - w * 0.02f)) drawRoundRect(woodDark, Offset(lx, wb - h * 0.025f), Size(w * 0.016f, h * 0.03f), CornerRadius(3f))
     drawRoundRect(wood, Offset(wx0 - w * 0.015f, wt - h * 0.02f), Size(wx1 - wx0 + w * 0.03f, h * 0.014f), CornerRadius(4f))
 
-    // ---- rug, slippers, floor plant
+    // ---- rug, floor plant
     rug(g, 0.2f, 0.7f, 0.34f, 0.94f, if (dark) Color(0xFF4F4378) else Color(0xFF9A86D6), if (dark) Color(0xFF6A5C91) else Color(0xFFC4B6F0), if (dark) Color(0xFF8E7FC0) else Color(0xFF7F69C4), if (dark) Color(0xFFB8B0D0) else Color(0xFFF4EFFF))
     fx.p("rug", 1500)?.let { dust(g, it) }
-    val slip = swing(fx.p("slippers", 1800), 18f, 24f)
-    for (i in 0..1) {
-        val c = g.floor(0.12f + 0.06f * i, 0.62f)
-        rotate(slip * (if (i == 0) 1 else -1), pivot = c) {
-            drawOval(Color(0xFFFFB3C7), Offset(c.x - w * 0.022f, c.y - h * 0.012f), Size(w * 0.05f, h * 0.026f))
-            drawOval(Color(0xFFFF8FB0), Offset(c.x - w * 0.002f, c.y - h * 0.014f), Size(w * 0.026f, h * 0.022f))
-        }
-    }
     plantPot(Offset(w * 0.925f, fy + h * 0.2f), w * 0.15f, swing(fx.p("fern", 2400), 12f, 20f) + sin(t * 0.8f) * 2f, Color(0xFF6DBB83), Color(0xFF4E9A66), Color(0xFF8E7FC0))
 
     // ---- nightstand with lamp, scent diffuser and a steaming mug (stands on the floor, against the wall)
@@ -722,22 +799,49 @@ private fun DrawScope.drawBedroom(g: Geo, t: Float, dark: Boolean, fx: Fx, lampO
     }
     if (pil != null) for (f in 0..3) { val k = (pil - 0.05f * f).coerceIn(0f, 1f); drawOval(Color.White, Offset(pc.x + (f - 1.5f) * w * 0.03f + sin(k * 7f + f) * 6f, pc.y - k * h * 0.12f), Size(w * 0.012f, w * 0.022f), alpha = 1f - k) }
 
-    // ---- the cat sleeps on the blanket – or sits on the rug; the diffuser lures it to the nightstand
+    // ---- the bouncy ball: tap it and it hops across the room and rolls back (the cat comes to watch and play)
+    val toyP = fx.p("toy", 7000)
+    val lane = fy + (h - fy) * 0.72f
+    val ballR = w * 0.034f; val restX = w * 0.765f
+    var bx = restX; var hop = 0f; var spin = 0f
+    if (toyP != null) {
+        if (toyP < 0.7f) { val k = toyP / 0.7f; bx = restX - w * 0.5f * k; hop = abs(sin(k * 5f * PI.toFloat())) * (1f - k * 0.75f) * h * 0.13f; spin = -k * 900f }
+        else { val k = ease((toyP - 0.7f) / 0.3f); bx = restX - w * 0.5f * (1f - k); spin = -900f + k * 900f }
+    }
+    drawOval(Color.Black, Offset(bx - ballR, lane - ballR * 0.35f), Size(ballR * 2f, ballR * 0.7f), alpha = 0.16f * (1f - (hop / (h * 0.13f)).coerceIn(0f, 1f) * 0.6f))
+    if (toyP != null) for (i in 1..5) { val tx = bx + i * ballR * 0.9f * (if (toyP < 0.7f) 1f else -1f); drawCircle(Color(0xFFFFE27A), ballR * 0.2f * (1f - i / 6f), Offset(tx, lane - ballR - hop * (1f - i / 6f)), alpha = 0.7f * (1f - i / 6f)) }
+    bounceBall(Offset(bx, lane - ballR - hop), ballR, spin, toyP != null)
+
+    // ---- the cat sleeps on the blanket – or sits on the rug; scent and toy call it, it plays and sniffs
     if (cat != null) {
         val s = minOf(w, h * 0.8f) * 0.3f
         val dpv = fx.p("diffuser", 7000)
-        val base = if (cat.phase == 0) Offset(w * 0.4f, blTop + h * 0.004f) else g.floor(0.44f, 0.72f)
-        val target = Offset(w * 0.68f, fy + h * 0.115f)
-        if (dpv != null) {
-            val k = when { dpv < 0.12f -> dpv / 0.12f; dpv > 0.88f -> (1f - dpv) / 0.12f; else -> 1f }
-            val pos = lerpOffset(base, target, k * k * (3f - 2f * k))
-            val moving = dpv < 0.12f || dpv > 0.88f
-            drawCatAt(pos, s, cat, if (moving) CatAnim.WALK else if ((t * 2f).toInt() % 2 == 0) CatAnim.TILT else CatAnim.LOOK, t, if (target.x > base.x) 1f else -1f)
-            if (!moving) for (i in 0..1) heart(Offset(pos.x + w * 0.05f + i * w * 0.03f, pos.y - s * 1.0f - ((t * 0.6f + i * 0.5f) % 1f) * h * 0.06f), w * 0.016f, 0.9f)
-        } else {
-            val anim = when { fx.p("cat", 2200) != null -> CatAnim.PURR; fx.p("blanket", 5200) != null && cat.phase == 0 -> CatAnim.LOOK; cat.phase == 0 -> CatAnim.SLEEP; else -> CatAnim.LOOK }
-            drawCatAt(base, s * (if (cat.phase == 0) 0.95f else 1f), cat, anim, t, if (cat.phase == 0) 1f else -1f)
+        val rest = if (cat.phase == 0) Offset(w * 0.4f, blTop + h * 0.004f) else g.floor(0.44f, 0.72f)
+        var pos = rest; var face = if (cat.phase == 0) 1f else -1f
+        var size = s * (if (cat.phase == 0) 0.95f else 1f)
+        var anim = when { fx.p("cat", 2200) != null -> CatAnim.PURR; fx.p("blanket", 5200) != null && cat.phase == 0 -> CatAnim.LOOK; cat.phase == 0 -> CatAnim.SLEEP; else -> CatAnim.LOOK }
+        var sniffing = false
+        when {
+            cat.arrive < 1f -> { pos = lerpOffset(Offset(-s * 0.7f, g.floor(0.44f, 0.72f).y), g.floor(0.44f, 0.72f), ease(cat.arrive)); anim = CatAnim.WALK; face = 1f; size = s }
+            toyP != null -> {
+                val follow = Offset((bx - s * 0.5f).coerceIn(s * 0.3f, w - s * 0.3f), lane + h * 0.02f)
+                val k = ease(toyP * 6f) * (1f - ease((toyP - 0.9f) * 10f))
+                pos = lerpOffset(rest, follow, k); size = s
+                face = if (bx > pos.x) 1f else -1f
+                anim = if (toyP < 0.7f) CatAnim.BOUNCE else CatAnim.WALK
+            }
+            dpv != null -> {
+                val k = when { dpv < 0.12f -> dpv / 0.12f; dpv > 0.88f -> (1f - dpv) / 0.12f; else -> 1f }
+                val target = Offset(w * 0.68f, fy + h * 0.115f)
+                pos = lerpOffset(rest, target, ease(k)); size = s
+                val moving = dpv < 0.12f || dpv > 0.88f
+                anim = if (moving) CatAnim.WALK else if ((t * 2f).toInt() % 2 == 0) CatAnim.TILT else CatAnim.LOOK
+                face = if (target.x > rest.x) 1f else -1f
+                sniffing = !moving
+            }
         }
+        drawCatAt(pos, size, cat, anim, t, face)
+        if (sniffing) for (i in 0..1) heart(Offset(pos.x + w * 0.05f + i * w * 0.03f, pos.y - s * 1.0f - ((t * 0.6f + i * 0.5f) % 1f) * h * 0.06f), w * 0.016f, 0.9f)
     }
     fx.p("cat", 2200)?.let { p -> for (i in 0..2) heart(Offset(w * (0.3f + 0.07f * i) + sin(p * 8f + i) * 6f, h * 0.5f - p * h * 0.12f - i * 14f), w * 0.02f, 1f - p) }
 

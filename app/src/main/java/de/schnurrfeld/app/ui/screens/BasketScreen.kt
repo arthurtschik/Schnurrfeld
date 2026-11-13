@@ -253,10 +253,18 @@ class PetSim(seed: Long = System.nanoTime()) {
     var doorK = 0f; private set
     private var doorStart = 0L; private var doorHome = 0
     private var goSpot: Spot? = null; private var goHome = 0; private var goSleep = false
+    /** a toy or the scent diffuser was tapped: the cat should come to this room as soon as it is free */
+    private var lureHome = 0; private var lureGo = false; private var luredIn = false
+    /** the room (1 / 2) the cat is on its way to, 0 = none */
+    val headingHome: Int get() = when {
+        lureHome != 0 -> lureHome
+        mode == Mode.GO || mode == Mode.ENTER -> goHome
+        mode == Mode.TREE_JUMP && jumpToSpot == Spot.DOOR_B && goHome == 2 -> 2
+        else -> 0
+    }
     private var restAnim = CatAnim.LOOK; private var restAnimUntil = 0L
     val scratching get() = mode == Mode.SCRATCH
     var scratchStart = 0L; private set
-    private var scratchSfxAt = 0L
     private var lastMeow = 0L
     /** the cat is somewhere the care items cannot reach it (up in the tree / at home) */
     private val away get() = spot != null || inside != 0 || mode == Mode.ENTER || mode == Mode.LEAVE
@@ -326,7 +334,18 @@ class PetSim(seed: Long = System.nanoTime()) {
         jumpFromSpot = from; jumpToSpot = to; mode = Mode.TREE_JUMP
     }
 
-    private fun enterDoor(now: Long, home: Int) { doorHome = home; doorStart = now; mode = Mode.ENTER; anim = CatAnim.WALK }
+    private fun enterDoor(now: Long, home: Int) { doorHome = home; doorStart = now; mode = Mode.ENTER; anim = CatAnim.WALK; luredIn = lureGo; lureGo = false }
+
+    /** the cat is called into a room (1 = living room, 2 = bedroom): it finishes what it is doing and comes */
+    fun lure(home: Int, now: Long) {
+        if (stage < PetRules.KRATZ_STAGE || inside == home || headingHome == home) return
+        lureHome = home
+        when {
+            mode == Mode.GO || mode == Mode.SCRATCH || mode == Mode.SCRATCH_WALK || mode == Mode.PLAY || mode == Mode.DANCE || mode == Mode.WALK -> mode = Mode.IDLE
+            mode == Mode.INSIDE -> { mode = Mode.LEAVE; doorStart = now }
+            mode == Mode.REST && spot != null -> spotJump(now, spot, null, 800)
+        }
+    }
 
     val jumping get() = jumpStart > 0 && last - jumpStart < jumpDur
 
@@ -375,7 +394,7 @@ class PetSim(seed: Long = System.nanoTime()) {
         } else if (mode == Mode.LEAVE) {
             doorK = 1f - ((now - doorStart) / 700f).coerceIn(0f, 1f); anim = CatAnim.WALK
             if (doorK <= 0f) {
-                inside = 0; goSleep = false
+                inside = 0; goSleep = false; goHome = 0; luredIn = false
                 if (spot != null) { mode = Mode.REST; until = now + 2500; restAnimUntil = 0L } else { mode = Mode.IDLE; until = now + 1500 }
             }
         }
@@ -418,7 +437,7 @@ class PetSim(seed: Long = System.nanoTime()) {
             Mode.SCRATCH_WALK -> {
                 val d = walkTo - x
                 if (abs(d) < 0.01f) {
-                    mode = Mode.SCRATCH; facing = -1f; scratchStart = now; scratchSfxAt = 0L
+                    mode = Mode.SCRATCH; facing = -1f; scratchStart = now
                     until = now + 4600 + rnd.nextLong(2600)
                 } else {
                     facing = if (d > 0) 1f else -1f
@@ -429,12 +448,11 @@ class PetSim(seed: Long = System.nanoTime()) {
             }
             Mode.SCRATCH -> {
                 anim = CatAnim.SCRATCH; facing = -1f
-                if (now - scratchSfxAt > 1250) { scratchSfxAt = now; sounds += Sfx.SCRATCH }
                 if (mood == de.schnurrfeld.app.data.Mood.SAD || now > until) { mode = Mode.IDLE; anim = CatAnim.WAG; until = now + 1600 + rnd.nextLong(1500) }
                 return
             }
             Mode.GO -> {
-                if (mood == de.schnurrfeld.app.data.Mood.SAD) { mode = Mode.IDLE; until = now + 500; return }
+                if (mood == de.schnurrfeld.app.data.Mood.SAD && !lureGo) { mode = Mode.IDLE; until = now + 500; return }
                 val tx = goSpot?.x ?: Tree.DOOR_A_X
                 val d = tx - x
                 if (abs(d) < 0.01f) {
@@ -457,7 +475,7 @@ class PetSim(seed: Long = System.nanoTime()) {
                 return
             }
             Mode.INSIDE -> {
-                if (mood == de.schnurrfeld.app.data.Mood.SAD || now > until) { mode = Mode.LEAVE; doorStart = now }
+                if ((mood == de.schnurrfeld.app.data.Mood.SAD && !luredIn) || now > until) { mode = Mode.LEAVE; doorStart = now }
                 return
             }
             Mode.NAP_IN -> return
@@ -467,6 +485,10 @@ class PetSim(seed: Long = System.nanoTime()) {
                 return
             }
             else -> {}
+        }
+        // called into a room by a toy: go there now (the sad ones come too)
+        if (lureHome != 0 && act == Act.NONE && pending == null && spot == null && inside == 0 && mode == Mode.IDLE) {
+            goHome = lureHome; goSpot = Tree.spotAt(goHome); goSleep = false; lureGo = true; mode = Mode.GO; lureHome = 0; return
         }
         if (now < until || pending != null) return          // (an item is on its way: no new plans)
         val r = rnd.nextFloat()
@@ -503,7 +525,7 @@ class PetSim(seed: Long = System.nanoTime()) {
     internal fun debugPose(pose: String, now: Long) {
         val far = now + 600_000
         when (pose) {
-            "scratch" -> { x = Tree.SCRATCH_X; facing = -1f; mode = Mode.SCRATCH; scratchStart = now; scratchSfxAt = now; until = far }
+            "scratch" -> { x = Tree.SCRATCH_X; facing = -1f; mode = Mode.SCRATCH; scratchStart = now; until = far }
             "roofA", "roofB", "step", "doorB" -> {
                 val s = when (pose) { "roofA" -> Spot.ROOF_A; "roofB" -> Spot.ROOF_B; "doorB" -> Spot.DOOR_B; else -> Spot.STEP }
                 spot = s; x = s.x; mode = Mode.REST; goSleep = false; restAnim = CatAnim.LOOK; restAnimUntil = far; until = far
