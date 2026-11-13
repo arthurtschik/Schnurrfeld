@@ -99,6 +99,54 @@ class PetShots {
         // one more item completes stage 1 (8 items, level 5) – the cat should grow right away
         rule.onNodeWithTag("care_FOOD").performClick(); settle(1500); shot("pet_grows_now_after")
     }
+    private fun post(name: String, pose: String, stage: Int = 6, dark: Boolean = false, breed: Breed = Breed.KARAMELL) {
+        val a = app()
+        a.store.resetPet()
+        val log = if (stage >= 6) "M".repeat(90) else "M".repeat(62)
+        a.store.updatePet { it.copy(introSeen = true, stage = stage, seenStage = stage, treeSeen = true, log = log, breedOverride = breed, talers = 7,
+            stock = mapOf(Care.FOOD to 3, Care.MILK to 2, Care.BRUSH to 5, Care.YARN to 1)) }
+        a.store.updateProgress { it.copy(unlocked = if (stage >= 6) 80 else 55) }
+        val sim = de.schnurrfeld.app.ui.screens.PetSim()
+        show(dark) { BasketScreen(a, sim) {} }
+        settle(300)
+        sim.debugPose(pose, android.os.SystemClock.uptimeMillis())
+        settle(1300); shot(name)
+    }
+    @Test fun postScratch() = post("post_scratch", "scratch")
+    @Test fun postRoofA() = post("post_roof_a", "roofA")
+    @Test fun postRoofB() = post("post_roof_b", "roofB", breed = Breed.MITTERNACHT)
+    @Test fun postStep() = post("post_step", "step", breed = Breed.MOPPEL)
+    @Test fun postPeekA() = post("post_peek_a", "peekA", breed = Breed.MOPPEL)
+    @Test fun postHomeB() = post("post_home_b", "homeB")
+    @Test fun postDoorB() = post("post_door_b", "doorB", breed = Breed.WOLKE)
+    @Test fun postRoofBDark() = post("post_roof_b_dark", "roofB", dark = true, breed = Breed.MITTERNACHT)
+    @Test fun postStage5() = post("post_stage5", "scratch", stage = 5, breed = Breed.MOPPEL)
+    @Test fun postNews() {
+        val a = app()
+        a.store.resetPet()
+        a.store.updatePet { it.copy(introSeen = true, stage = 6, seenStage = 6, log = "B".repeat(90), breedOverride = Breed.WOLKE, talers = 7) }
+        a.store.updateProgress { it.copy(unlocked = 80) }
+        show { BasketScreen(a) {} }
+        settle(1200); shot("post_news")
+    }
+
+    private fun room(name: String, home: Int, pose: String?, dark: Boolean = false, breed: Breed = Breed.KARAMELL, at: Long = 1500) {
+        val a = app()
+        a.store.resetPet()
+        a.store.updatePet { it.copy(introSeen = true, stage = 6, seenStage = 6, treeSeen = true, log = "M".repeat(90), breedOverride = breed) }
+        a.store.updateProgress { it.copy(unlocked = 80) }
+        val sim = de.schnurrfeld.app.ui.screens.PetSim()
+        pose?.let { sim.debugPose(it, android.os.SystemClock.uptimeMillis()) }
+        show(dark) { de.schnurrfeld.app.ui.screens.RoomOverlay(a, a.store.pet, sim, home) {} }
+        settle(at); shot(name)
+    }
+    @Test fun roomLivingEmpty() = room("room_living_empty", 1, null)
+    @Test fun roomLivingChair() = room("room_living_chair", 1, "homeA", breed = Breed.MOPPEL)
+    @Test fun roomLivingRug() = room("room_living_rug", 1, "homeA", breed = Breed.MITTERNACHT, at = 15_500)
+    @Test fun roomBedEmpty() = room("room_bed_empty", 2, null)
+    @Test fun roomBedSleeping() = room("room_bed_sleep", 2, "homeB", breed = Breed.WOLKE)
+    @Test fun roomLivingDark() = room("room_living_dark", 1, "homeA", dark = true, breed = Breed.MITTERNACHT)
+
     @Test fun stage4Dark() = basket("pet_stage4_wolke_dark", 4, "B".repeat(45), dark = true)
     @Test fun breeds() {
         for (b in Breed.entries) {

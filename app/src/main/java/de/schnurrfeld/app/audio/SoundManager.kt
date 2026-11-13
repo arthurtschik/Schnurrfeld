@@ -15,7 +15,36 @@ enum class Sfx(val res: Int) {
     SUCCESS_4(R.raw.success_4), SUCCESS_5(R.raw.success_5),
     WIN(R.raw.win), JOKER(R.raw.joker), TAP(R.raw.tap),
     FILL(R.raw.fill), PRIZE(R.raw.prize), SLAM(R.raw.slam),
-    PURR(R.raw.purr), COIN(R.raw.coin), CRANK(R.raw.crank), NOM(R.raw.nom)
+    PURR(R.raw.purr), COIN(R.raw.coin), CRANK(R.raw.crank), NOM(R.raw.nom), SCRATCH(R.raw.scratch),
+    // real recordings: kitten calls (high) and a bigger cat (lower)
+    MEOW_KITTEN_1(R.raw.meow_kitten_1), MEOW_KITTEN_2(R.raw.meow_kitten_2), MEOW_KITTEN_3(R.raw.meow_kitten_3),
+    MEOW_KITTEN_4(R.raw.meow_kitten_4), MEOW_KITTEN_5(R.raw.meow_kitten_5), MEOW_KITTEN_LONG(R.raw.meow_kitten_long),
+    MEOW_CAT_1(R.raw.meow_cat_1), MEOW_CAT_2(R.raw.meow_cat_2), MEOW_CAT_3(R.raw.meow_cat_3),
+    MEOW_CAT_4(R.raw.meow_cat_4), MEOW_CAT_5(R.raw.meow_cat_5), MEOW_CAT_TRILL(R.raw.meow_cat_trill),
+    MEOW_CAT_LONG(R.raw.meow_cat_long);
+
+    val isMeow get() = name.startsWith("MEOW_")
+}
+
+/**
+ * A meow that fits the cat's age: small cats squeak, grown ones sound deeper.
+ * [long] is the drawn-out call used when the cat misses you or is overjoyed.
+ */
+fun meowFor(stage: Int, long: Boolean, rnd: kotlin.random.Random = kotlin.random.Random.Default): Sfx {
+    val kitten = listOf(Sfx.MEOW_KITTEN_1, Sfx.MEOW_KITTEN_2, Sfx.MEOW_KITTEN_3, Sfx.MEOW_KITTEN_4, Sfx.MEOW_KITTEN_5)
+    val cat = listOf(Sfx.MEOW_CAT_1, Sfx.MEOW_CAT_2, Sfx.MEOW_CAT_3, Sfx.MEOW_CAT_4, Sfx.MEOW_CAT_5)
+    return when {
+        stage <= 3 -> if (long) Sfx.MEOW_KITTEN_LONG else kitten.random(rnd)
+        stage == 4 -> if (long) (if (rnd.nextBoolean()) Sfx.MEOW_KITTEN_LONG else Sfx.MEOW_CAT_LONG) else (kitten + Sfx.MEOW_CAT_3).random(rnd)
+        stage == 5 -> if (long) Sfx.MEOW_CAT_LONG else (cat + kitten.take(2)).random(rnd)
+        else -> if (long) Sfx.MEOW_CAT_LONG else (cat + Sfx.MEOW_CAT_TRILL).random(rnd)
+    }
+}
+
+/** playback speed that makes the same recording sound a little different every time (and the youngest a bit squeakier) */
+fun meowRate(sfx: Sfx, stage: Int, rnd: kotlin.random.Random = kotlin.random.Random.Default): Float {
+    val base = if (sfx.name.startsWith("MEOW_KITTEN")) (if (stage <= 2) 1.1f else 1.0f) else 0.97f
+    return base + (rnd.nextFloat() - 0.5f) * 0.1f
 }
 
 /** One of three slightly different bubble pops, so crosses never sound mechanical. */

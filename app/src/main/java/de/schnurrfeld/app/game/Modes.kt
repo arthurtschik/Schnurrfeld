@@ -12,9 +12,13 @@ sealed class GameMode {
 
 object Levels {
     /** (size, number of levels with that size) */
-    // 200 levels, 10×10 at most (bigger boards make the cells too small)
+    // first wave: levels 1-200, 10×10 at most (bigger boards make the cells too small)
     private val bands = listOf(5 to 8, 6 to 9, 7 to 13, 8 to 20, 9 to 40, 10 to 110)
-    val count = bands.sumOf { it.second }
+    /** second wave: levels 201-500, starts at 8×8 again and is hard from the start */
+    private val bands2 = listOf(8 to 30, 9 to 90, 10 to 180)
+    /** number of levels in the first wave (their puzzles and tags never change) */
+    const val FIRST_WAVE = 200
+    val count = bands.sumOf { it.second } + bands2.sumOf { it.second }
 
     data class Config(val size: Int, val difficulty: Float, val indexInBand: Int, val bandLength: Int, val maxRating: Int)
 
@@ -39,12 +43,20 @@ object Levels {
             }
             start += len
         }
+        for ((size, len) in bands2) {
+            if (level < start + len) {
+                val idx = level - start
+                val ramp = if (len <= 1) 0f else idx.toFloat() / (len - 1)
+                return Config(size, 0.5f + 0.5f * ramp, idx, len, 4)
+            }
+            start += len
+        }
         return Config(10, 1f, 0, 1, 4)
     }
 
     fun groups(): List<Pair<Int, IntRange>> {
         var start = 1
-        return bands.map { (size, len) ->
+        return (bands + bands2).map { (size, len) ->
             val range = start until start + len
             start += len
             size to range

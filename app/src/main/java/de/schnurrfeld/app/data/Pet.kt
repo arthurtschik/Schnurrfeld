@@ -44,6 +44,8 @@ data class Pet(
     val needsAt: Long = 0L,
     /** last time the Katzenkörbchen was opened (epoch ms) – for the "missed you" reunion */
     val lastVisit: Long = 0L,
+    /** the player has been told about the scratching post (so older cats get a one-time notice) */
+    val treeSeen: Boolean = false,
 ) {
     val given get() = log.length
     fun stockOf(c: Care) = stock[c] ?: 0
@@ -73,6 +75,8 @@ object PetRules {
     const val HATCH_STAGE = 2
     /** stage from which there is the bigger basket */
     const val BIG_BASKET_STAGE = 4
+    /** stage from which the scratching post stands in the room */
+    const val KRATZ_STAGE = 5
     /** stage at which the cat is fully grown */
     const val ADULT_STAGE = 6
     /** highest stage available in this version (the palace follows with 1.4) */

@@ -58,4 +58,114 @@ class PetSimTest {
         assertTrue("cat plays with the ball", swats >= 2)
         assertTrue("no flickering between poses ($changes changes)", changes < 30)
     }
+
+    @Test fun grownCatsUseTheScratchingPost() {
+        val sim = PetSim(seed = 11).apply { stage = 6 }
+        var t = 1000L
+        var scratched = false; var climbed = false; var scratchSounds = 0
+        val end = t + 15 * 60_000L          // 15 minutes of cat life
+        while (t < end) {
+            t += 16; sim.step(t, 0.6f)
+            if (sim.scratching) scratched = true
+            if (sim.spot != null) climbed = true
+            while (sim.sounds.isNotEmpty()) if (sim.sounds.removeAt(0) == de.schnurrfeld.app.audio.Sfx.SCRATCH) scratchSounds++
+        }
+        assertTrue("scratches the post", scratched && scratchSounds > 0)
+        assertTrue("climbs up to the top cushion", climbed)
+    }
+
+    @Test fun youngCatsIgnoreThePost() {
+        val sim = PetSim(seed = 5).apply { stage = 4 }
+        var t = 1000L
+        val end = t + 10 * 60_000L
+        while (t < end) {
+            t += 16; sim.step(t, 0.6f)
+            assertTrue("no tree below stage 5", !sim.scratching && sim.spot == null && sim.inside == 0)
+        }
+    }
+
+    @Test fun catComesDownFromThePostForItsFood() {
+        val sim = PetSim(seed = 3).apply { stage = 6 }
+        var t = run(sim, 1000, 300)
+        sim.debugPose("roofA", t)
+        t = run(sim, t, 500)
+        assertTrue(sim.spot != null)
+        sim.feed(Care.FOOD)
+        t = run(sim, t, 6000)
+        assertTrue("came down", sim.spot == null)
+        assertEquals(Act.FOOD, sim.act)
+    }
+
+    @Test fun catMeowsNowAndThenAndSadOnesCallForYou() {
+        val sim = PetSim(seed = 9).apply { stage = 4; mood = de.schnurrfeld.app.data.Mood.SAD }
+        var t = 1000L; var meows = 0
+        val end = t + 3 * 60_000L
+        while (t < end) {
+            t += 16; sim.step(t, 0.6f)
+            while (sim.sounds.isNotEmpty()) if (sim.sounds.removeAt(0).isMeow) meows++
+        }
+        assertTrue("a sad kitten mews ($meows)", meows >= 5)
+    }
+
+    @Test fun foodThatArrivesWhileJumpingUpDoesNotStrandTheCat() {
+        val sim = PetSim(seed = 21).apply { stage = 6 }
+        var t = 1000L
+        // wait until the cat takes off towards the post, then feed it in mid-air
+        var guard = 0
+        while (!(sim.jumping && sim.jumpKind == 1) && guard++ < 200_000) { t += 16; sim.step(t, 0.6f) }
+        assertTrue("cat took off", sim.jumping && sim.jumpKind == 1)
+        sim.feed(Care.FOOD)
+        t = run(sim, t, 12_000)
+        assertTrue("back on the floor", sim.spot == null && sim.inside == 0)
+        assertTrue("cat is at the bowl or done", sim.act == Act.NONE || abs(sim.x - sim.itemX) < 0.05f)
+    }
+
+    @Test fun catsDisappearIntoTheCavesAndSometimesShowTheirTail() {
+        var seenA = false; var seenB = false; var peeked = false; var hiddenNoTail = false
+        for (seed in 1L..6L) {
+            val sim = PetSim(seed).apply { stage = 6 }
+            var t = 1000L
+            val end = t + 20 * 60_000L
+            while (t < end) {
+                t += 16; sim.step(t, 0.6f)
+                if (sim.inside == 1) seenA = true
+                if (sim.inside == 2) seenB = true
+                if (sim.inside != 0 && sim.peekTail) peeked = true
+                if (sim.inside != 0 && !sim.peekTail) hiddenNoTail = true
+            }
+        }
+        assertTrue("goes home to cave A", seenA)
+        assertTrue("goes home to cave B", seenB)
+        assertTrue("sometimes a tail sticks out", peeked)
+        assertTrue("but not always", hiddenNoTail)
+    }
+
+    @Test fun foodMakesACatComeOutOfItsCave() {
+        for (pose in listOf("homeA", "homeB")) {
+            val sim = PetSim(seed = 4).apply { stage = 6 }
+            var t = run(sim, 1000, 300)
+            sim.debugPose(pose, t)
+            t = run(sim, t, 300)
+            assertTrue("$pose: at home", sim.inside != 0)
+            sim.feed(Care.MILK)
+            var drank = false; var cameOut = false
+            val end = t + 14_000
+            while (t < end) {
+                t += 16; sim.step(t, 0.6f)
+                if (sim.act == Act.MILK && sim.actPhase() >= 1) drank = true
+                if (sim.inside == 0 && sim.spot == null) cameOut = true
+            }
+            assertTrue("$pose: came out", cameOut)
+            assertTrue("$pose: drank the milk", drank)
+        }
+    }
+
+    @Test fun aCatAtHomeCannotBePetted() {
+        val sim = PetSim(seed = 2).apply { stage = 6 }
+        var t = run(sim, 1000, 300)
+        sim.debugPose("homeA", t)
+        t = run(sim, t, 300)
+        assertEquals(1f, sim.doorK, 0.001f)
+        assertEquals(1, sim.inside)
+    }
 }
