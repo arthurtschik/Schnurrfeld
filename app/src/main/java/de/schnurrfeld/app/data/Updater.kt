@@ -25,8 +25,8 @@ data class ReleaseInfo(val version: String, val notes: String, val apkUrl: Strin
 /**
  * Updates via GitHub Releases of arthurtschik/Schnurrfeld.
  *
- * Release convention: tag "v1.3" (or "1.3"), APK attached as "Schnurrfeld-1.3.apk"
- * (and optionally "Schnurrfeld-1.3-Dev.apk" for the developer app).
+ * Release convention: tag "v1.4"; APK attached under a fixed name "Schnurrfeld.apk"
+ * (and "Schnurrfeld-Dev.apk" for the developer app), so that .../releases/latest/download/Schnurrfeld.apk always works.
  * The APK must be signed with the same key and have a higher versionCode, otherwise Android refuses to install it.
  */
 object Updater {
