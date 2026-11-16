@@ -105,9 +105,27 @@
   @keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-16px); } }
   .hop { animation: hop .45s ease-out; }
 
-  .sitter { position: absolute; right: 22px; bottom: calc(100% - 7px); width: 62px; pointer-events: auto; cursor: pointer; }
+  /* the glitch: only the cats have it. red/cyan split plus sliced, shifted stripes for a moment */
+  .gl { display: block; }
+  .gl.glitch {
+    animation: glitch .38s steps(1, end);
+    filter: drop-shadow(3px 0 0 rgba(0, 229, 255, .8)) drop-shadow(-3px 0 0 rgba(255, 45, 120, .8));
+  }
+  @keyframes glitch {
+    0%   { transform: translate(0, 0); clip-path: inset(0 0 0 0); }
+    10%  { transform: translate(-5px, 0) skewX(-8deg); clip-path: inset(8% 0 62% 0); }
+    22%  { transform: translate(6px, 1px); clip-path: inset(48% 0 18% 0); }
+    34%  { transform: translate(-2px, -1px) skewX(6deg); clip-path: inset(0 0 0 0); }
+    46%  { transform: translate(4px, 0); clip-path: inset(28% 0 42% 0); }
+    58%  { transform: translate(-6px, 1px) skewX(-5deg); clip-path: inset(68% 0 4% 0); }
+    70%  { transform: translate(3px, -1px); clip-path: inset(0 0 30% 0); }
+    82%  { transform: translate(-2px, 0); clip-path: inset(0 0 0 0); }
+    100% { transform: translate(0, 0); clip-path: inset(0 0 0 0); }
+  }
+  .sitter {  position: absolute; right: 22px; bottom: calc(100% - 7px); width: 62px; pointer-events: auto; cursor: pointer; }
   .sleeper { position: absolute; left: 12px; bottom: calc(100% - 7px); width: 54px; pointer-events: auto; cursor: pointer; }
   .sitter .cs, .sleeper .cs { width: 100%; height: auto; display: block; }
+  .breed:hover .gl, .fc:hover .gl { filter: drop-shadow(2px 0 0 rgba(0, 229, 255, .6)) drop-shadow(-2px 0 0 rgba(255, 45, 120, .6)); }
 
   #floor { position: fixed; left: 0; right: 0; bottom: 0; height: 112px; pointer-events: none; z-index: 3; }
   #floor .ground {
@@ -124,7 +142,7 @@
   .paw { position: fixed; z-index: 0; width: 34px; opacity: .08; fill: var(--text); pointer-events: none; }
 
   @media (prefers-reduced-motion: reduce) {
-    .cs .tail, .cs .eo, .cs .bob, .cs .head, .cs .zz { animation: none !important; }
+    .cs .tail, .cs .eo, .cs .bob, .cs .head, .cs .zz, .gl { animation: none !important; filter: none !important; }
     .btn { transition: none; }
   }
 </style>
@@ -274,6 +292,23 @@
     return s;
   }
 
+  // every cat gets a wrapper that can glitch; short bursts at random times (never on the rest of the page)
+  function glitchy(svgHtml) { return '<div class="gl">' + svgHtml + '</div>'; }
+  var noMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function burst(el, ms) {
+    el.classList.remove("glitch"); void el.offsetWidth; el.classList.add("glitch");
+    setTimeout(function () { el.classList.remove("glitch"); }, ms || 380);
+  }
+  function glitchLater(el) {
+    if (noMotion) return;
+    setTimeout(function () {
+      if (!document.body.contains(el)) return;
+      burst(el, 380);
+      if (Math.random() < 0.35) setTimeout(function () { burst(el, 260); }, 520);   // sometimes twice in a row
+      glitchLater(el);
+    }, 2500 + Math.random() * 7500);
+  }
+
   // ---------------------------------------------------------------- little hearts when a cat is tapped
   function heartAt(x, y) {
     var h = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -287,23 +322,24 @@
     var r = el.getBoundingClientRect();
     for (var i = 0; i < 3; i++) setTimeout(function () { heartAt(r.left + r.width / 2 + (Math.random() * 24 - 12), r.top + 6); }, i * 140);
     svg.classList.remove("hop"); void svg.getBoundingClientRect(); svg.classList.add("hop");
+    var g = svg.parentNode; if (g && g.classList && g.classList.contains("gl")) burst(g, 460);
     setTimeout(function () { svg.classList.remove("hop"); }, 500);
   }
 
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // cat on the button, sleeper on the link, and the six at the bottom of the page
-  var sitter = document.getElementById("sitter"); sitter.innerHTML = catSVG("wolke", "sitting");
-  var sleeper = document.getElementById("sleeper"); sleeper.innerHTML = catSVG("mitternacht", "sleeping");
-  [sitter, sleeper].forEach(function (el) { el.addEventListener("click", function () { pet(el, el.firstChild); }); });
+  var sitter = document.getElementById("sitter"); sitter.innerHTML = glitchy(catSVG("wolke", "sitting"));
+  var sleeper = document.getElementById("sleeper"); sleeper.innerHTML = glitchy(catSVG("mitternacht", "sleeping"));
+  [sitter, sleeper].forEach(function (el) { el.addEventListener("click", function () { pet(el, el.querySelector(".cs")); }); glitchLater(el.firstChild); });
 
   var row = document.getElementById("breeds");
   ORDER.forEach(function (k) {
     var b = document.createElement("button");
     b.type = "button"; b.className = "breed"; b.setAttribute("aria-label", BREEDS[k].name + " streicheln");
-    b.innerHTML = catSVG(k, "sitting") + BREEDS[k].name;
+    b.innerHTML = glitchy(catSVG(k, "sitting")) + BREEDS[k].name;
     b.addEventListener("click", function () { pet(b, b.querySelector(".cs")); });
-    row.appendChild(b);
+    row.appendChild(b); glitchLater(b.firstChild);
   });
 
   // ---------------------------------------------------------------- the ones walking along the bottom
@@ -317,9 +353,9 @@
       var size = i === 4 ? 56 : 64 + (i % 3) * 5;
       var el = document.createElement("div");
       el.className = "fc"; el.style.width = size + "px"; el.style.bottom = (4 + (i % 3) * 7) + "px"; el.style.zIndex = String(10 - (i % 3));
-      el.innerHTML = catSVG(ORDER[i % ORDER.length], "walking");
-      floor.appendChild(el);
-      var c = { el: el, svg: el.firstChild, size: size, x: (W - size) * (i + 0.5) / count, dir: i % 2 ? 1 : -1, speed: 22 + Math.random() * 30, state: "walk", until: 0 };
+      el.innerHTML = glitchy(catSVG(ORDER[i % ORDER.length], "walking"));
+      floor.appendChild(el); glitchLater(el.firstChild);
+      var c = { el: el, svg: el.querySelector(".cs"), size: size, x: (W - size) * (i + 0.5) / count, dir: i % 2 ? 1 : -1, speed: 22 + Math.random() * 30, state: "walk", until: 0 };
       (function (c) { el.addEventListener("click", function () { pet(c.el, c.svg); c.state = "sit"; c.until = performance.now() + 2200; c.svg.className.baseVal = "cs sitting"; }); })(c);
       cats.push(c);
     }
