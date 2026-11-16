@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F3EADB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Schnurrfeld Datenschutz</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<style>
+  :root { --bg: #F3EADB; --surface: #FBF6EE; --line: #D9CAB3; --text: #2A2420; --dim: #6E6358; --accent: #E8846B; --glow: rgba(232, 132, 107, .30); }
+  @media (prefers-color-scheme: dark) { :root { --bg: #121214; --surface: #1C1C20; --line: #2C2C31; --text: #E8E6E3; --dim: #A9A6A1; --accent: #F09A82; --glow: rgba(240, 154, 130, .16); } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(120% 40% at 50% 0%, var(--glow), transparent 60%), var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 28px 20px 48px; }
+  main { max-width: 640px; margin: 0 auto; }
+  .head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .head img { width: 56px; height: 56px; border-radius: 14px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -.5px; }
+  h2 { margin: 28px 0 4px; font-size: 16px; }
+  p, li { color: var(--dim); font-size: 14.5px; margin: 0 0 8px; }
+  ul { padding-left: 20px; margin: 0 0 8px; }
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; margin: 18px 0; }
+  .box p { color: var(--text); margin: 0; }
+  a { color: var(--accent); }
+  .back { display: inline-block; margin-top: 24px; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="head"><img alt="" src="assets/logo.svg"><h1>Datenschutz der App Schnurrfeld</h1></div>
+
+  <div class="box"><p>Kurz gesagt: Schnurrfeld hat keine Konten, keine Werbung und kein Tracking. Dein Spielstand bleibt auf deinem Gerät. Die App verbindet sich nur mit GitHub, um nach Updates zu suchen, und das kannst du abschalten.</p></div>
+
+  <h2>Verantwortlicher</h2>
+  <p>Arthurtschik, c/o Block Services, Stuttgarter Str. 106, 70736 Fellbach, E-Mail: arthurtschik.business@gmail.com</p>
+
+  <h2>Was die App speichert</h2>
+  <p>Spielstand, Einstellungen und der Zustand deines Kätzchens liegen nur lokal auf dem Gerät. Die App legt kein Konto an, sendet keine Spielstände ab und nutzt keine Analyse- oder Werbedienste und keine fremden Software-Bausteine mit Netzwerkzugriff.</p>
+  <p>Wenn du die Android-Datensicherung aktiviert hast, kann Android deinen Spielstand in dein Google-Konto sichern. Das geschieht über Android und Google, nicht über die App.</p>
+
+  <h2>Verbindung zu GitHub (Update-Suche)</h2>
+  <p>Beim Start der App und wenn du „Nach Updates suchen“ antippst, fragt die App bei GitHub (api.github.com, GitHub Inc., USA) nach der neuesten Version. Dabei erhält GitHub wie bei jedem Aufruf einer Webseite deine IP-Adresse und den Namen der App („Schnurrfeld-App“). Sonst wird nichts gesendet.</p>
+  <p>Ein Update lädt die App nur von GitHub aus dem Projekt Schnurrfeld per HTTPS herunter. Vor der Installation prüft sie, dass die Datei dieselbe App, eine höhere Version und denselben Signaturschlüssel hat. Installiert wird erst, wenn du es in Android bestätigst.</p>
+  <p>Die automatische Suche kannst du unter Einstellungen › App abschalten.</p>
+
+  <h2>Berechtigungen</h2>
+  <ul>
+    <li>Internet: nur für die Update-Suche (siehe oben)</li>
+    <li>Vibration: für das Feedback beim Spielen, abschaltbar in den Einstellungen</li>
+    <li>Apps installieren: damit die App ein heruntergeladenes Update nach deiner Bestätigung installieren kann</li>
+  </ul>
+  <p>Die App braucht kein Mikrofon, keinen Standort, keine Kontakte und keinen Speicherzugriff.</p>
+
+  <h2>Sprachausgabe</h2>
+  <p>Das gesprochene Lob kommt aus mitgelieferten Aufnahmen. Für Wörter ohne Aufnahme kann die App optional die Sprachausgabe deines Geräts nutzen („Computerstimme als Ersatz“). Die verarbeitet dein Gerät beziehungsweise dein Sprachdienst, nicht die App.</p>
+
+  <h2>Deine Rechte</h2>
+  <p>Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch sowie Beschwerde bei einer Datenschutz-Aufsichtsbehörde. Schreib dafür an die oben genannte E-Mail-Adresse. Deine Spieldaten löschst du, indem du in den Einstellungen den Fortschritt zurücksetzt oder die App deinstallierst.</p>
+
+  <p>Stand: November 2026</p>
+  <a class="back" href="index.html">Zurück zur Download-Seite</a>
+</main>
+</body>
+</html>
