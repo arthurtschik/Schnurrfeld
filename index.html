@@ -75,7 +75,7 @@
 
   .legal { margin-top: 14px; text-align: left; }
   .legal details { border-top: 1px solid var(--line); padding: 8px 0; }
-  .legal summary { cursor: pointer; color: var(--dim); font-size: 12px; list-style: none; text-align: center; }
+  .legal summary { cursor: pointer; color: var(--dim); font-size: 14px; font-weight: 600; padding: 4px 0; list-style: none; text-align: center; }
   .legal summary::-webkit-details-marker { display: none; }
   .legal summary:hover { text-decoration: underline; }
   .legal .body { margin: 8px 0 4px; color: var(--faint); font-size: 12px; line-height: 1.6; }
@@ -162,6 +162,7 @@
     <a id="dl" class="btn" href="https://github.com/arthurtschik/Schnurrfeld/releases/latest/download/Schnurrfeld.apk">Hier downloaden</a>
   </div>
   <p id="meta" class="meta">Suche aktuelle Version …</p>
+  <p class="meta"><a href="#impressum" data-open="impressum">Impressum</a> · <a href="#datenschutz" data-open="datenschutz">Datenschutz</a></p>
   <p class="hint">Nach dem Download die Datei öffnen und die Installation bestätigen (eventuell musst du „Installation aus unbekannten Quellen“ erlauben). Zeigt Android eine Warnung von Play Protect, tippe auf „Weitere Details“ und dann auf „Trotzdem installieren“. Updates findest du später direkt in der App unter Einstellungen – dein Spielstand bleibt erhalten.</p>
 
   <details class="news" id="news" hidden>
@@ -184,7 +185,7 @@
   Für den Download, die Datei und die Nutzung der App übernehme ich keine Verantwortung, die Nutzung erfolgt auf eigenes Risiko.
 
   <div class="legal">
-    <details>
+    <details id="impressum">
       <summary>Impressum</summary>
       <div class="body">
         <h2>Angaben gemäß § 5 DDG</h2>
@@ -195,7 +196,7 @@
         <p>Arthurtschik, Anschrift wie oben.</p>
       </div>
     </details>
-    <details>
+    <details id="datenschutz">
       <summary>Datenschutz</summary>
       <div class="body">
         <h2>Verantwortlicher</h2>
@@ -219,6 +220,7 @@
 <div id="floor" aria-hidden="true"><div class="ground"></div></div>
 
 <script>
+document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest("[data-open]"); if (!a) return; var d = document.getElementById(a.getAttribute("data-open")); if (d) { d.open = true; setTimeout(function () { d.scrollIntoView({ behavior: "smooth", block: "start" }); }, 30); e.preventDefault(); } });
 (function () {
   "use strict";
 
