@@ -53,13 +53,10 @@
 
   details.news { margin: 22px 0 0; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 4px 16px; }
   details.news[hidden] { display: none; }
-  details.news summary { cursor: pointer; padding: 10px 0; font-weight: 700; font-size: 14.5px; list-style: none; text-align: center; }
+  details.news summary { cursor: pointer; padding: 10px 0; font-weight: 700; font-size: 14.5px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
   details.news summary::-webkit-details-marker { display: none; }
-  details.news summary::after { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 0 3px 10px; border-right: 2.5px solid var(--accent); border-bottom: 2.5px solid var(--accent); transform: rotate(45deg); transition: transform .2s ease; vertical-align: middle; }
-  details.news[open] summary::after { transform: rotate(-135deg); margin-bottom: -2px; }
-  details.news summary { animation: nudge 2.6s ease-in-out 1.5s 3; }
-  @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
-  @media (prefers-reduced-motion: reduce) { details.news summary { animation: none; } }
+  details.news summary::after { content: "▾"; color: var(--dim); transition: transform .15s ease; }
+  details.news[open] summary::after { transform: rotate(180deg); }
   details.news .list { padding: 0 0 12px; font-size: 13.5px; color: var(--dim); }
   details.news h3 { margin: 12px 0 2px; font-size: 13.5px; color: var(--text); }
   details.news ul { margin: 0; padding-left: 18px; }
