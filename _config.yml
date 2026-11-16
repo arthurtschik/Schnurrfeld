@@ -1,0 +1,17 @@
+# GitHub Pages: the site is index.html + datenschutz.html + assets/ in the repository root.
+# Everything else (the Android project etc.) must not be published.
+title: Schnurrfeld
+exclude:
+  - app
+  - gradle
+  - gradlew
+  - gradlew.bat
+  - build.gradle.kts
+  - settings.gradle.kts
+  - gradle.properties
+  - screenshots
+  - docs
+  - release
+  - README.md
+  - SECURITY.md
+  - LICENSE

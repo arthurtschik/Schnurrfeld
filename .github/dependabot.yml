@@ -6,9 +6,3 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-
-  # the actions used by the website workflow
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "monthly"
