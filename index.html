@@ -55,6 +55,11 @@
   details.news[hidden] { display: none; }
   details.news summary { cursor: pointer; padding: 10px 0; font-weight: 700; font-size: 14.5px; list-style: none; text-align: center; }
   details.news summary::-webkit-details-marker { display: none; }
+  details.news summary::after { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 0 3px 10px; border-right: 2.5px solid var(--accent); border-bottom: 2.5px solid var(--accent); transform: rotate(45deg); transition: transform .2s ease; vertical-align: middle; }
+  details.news[open] summary::after { transform: rotate(-135deg); margin-bottom: -2px; }
+  details.news summary { animation: nudge 2.6s ease-in-out 1.5s 3; }
+  @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+  @media (prefers-reduced-motion: reduce) { details.news summary { animation: none; } }
   details.news .list { padding: 0 0 12px; font-size: 13.5px; color: var(--dim); }
   details.news h3 { margin: 12px 0 2px; font-size: 13.5px; color: var(--text); }
   details.news ul { margin: 0; padding-left: 18px; }
@@ -102,7 +107,7 @@
   @keyframes sway { 0%, 100% { transform: rotate(-2.2deg); } 50% { transform: rotate(2.2deg); } }
   @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
   @keyframes zz { 0% { opacity: 0; transform: translate(0, 4px); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(6px, -14px); } }
-  @keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-16px); } }
+  @keyframes hop { 0%, 100% { translate: 0 0; } 40% { translate: 0 -16px; } }
   .hop { animation: hop .45s ease-out; }
 
   /* the glitch: only the cats have it. red/cyan split plus sliced, shifted stripes for a moment */
@@ -134,7 +139,9 @@
       repeating-linear-gradient(90deg, transparent 0 118px, rgba(0,0,0,.08) 118px 120px),
       linear-gradient(var(--floor1), var(--floor2));
   }
-  #floor .fc { position: absolute; left: 0; width: 70px; will-change: transform; pointer-events: auto; cursor: pointer; }
+  #floor .fc { position: absolute; left: 0; width: 70px; will-change: transform; pointer-events: auto; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #floor .toy { position: absolute; left: 0; bottom: 4px; z-index: 9; pointer-events: auto; cursor: pointer; will-change: transform; touch-action: manipulation; }
+  #floor .toy svg { display: block; width: 100%; height: auto; }
   #floor .fc .cs { width: 100%; height: auto; display: block; transform-origin: 50% 90%; }
   .heart { position: absolute; width: 16px; height: 16px; pointer-events: none; z-index: 6; animation: rise 1.3s ease-out forwards; }
   @keyframes rise { from { opacity: 1; transform: translate(0, 0) scale(.7); } to { opacity: 0; transform: translate(var(--dx, 0), -64px) scale(1.15); } }
@@ -168,9 +175,6 @@
     <summary id="news-title">Das ist neu</summary>
     <div class="list" id="news-list"></div>
   </details>
-
-  <p class="breeds-title">Sechs Katzen warten auf dich – tipp sie an</p>
-  <div class="breeds" id="breeds"></div>
 
   <div class="store-wrap">
     <div class="sleeper" id="sleeper" role="img" aria-label="Eine schwarze Katze schläft auf dem Link"></div>
@@ -333,66 +337,167 @@
   var sleeper = document.getElementById("sleeper"); sleeper.innerHTML = glitchy(catSVG("mitternacht", "sleeping"));
   [sitter, sleeper].forEach(function (el) { el.addEventListener("click", function () { pet(el, el.querySelector(".cs")); }); glitchLater(el.firstChild); });
 
-  var row = document.getElementById("breeds");
-  ORDER.forEach(function (k) {
-    var b = document.createElement("button");
-    b.type = "button"; b.className = "breed"; b.setAttribute("aria-label", BREEDS[k].name + " streicheln");
-    b.innerHTML = glitchy(catSVG(k, "sitting")) + BREEDS[k].name;
-    b.addEventListener("click", function () { pet(b, b.querySelector(".cs")); });
-    row.appendChild(b); glitchLater(b.firstChild);
-  });
-
   // ---------------------------------------------------------------- the ones walking along the bottom
   var floor = document.getElementById("floor");
-  var cats = [];
+  var cats = [], toys = [], c_bot = 0;
+  var perches = [{ el: document.getElementById("dl"), fx: 0.33, taken: false }, { el: document.querySelector(".store"), fx: 0.68, taken: false }];
+  var YARN = '<svg viewBox="0 0 32 28"><circle cx="14" cy="14" r="12" fill="#E5484D"/><path d="M5 9 C11 14 17 14 23 8 M3 14 C10 19 18 19 25 13 M6 21 C12 23 19 22 24 18 M9 4 C12 9 12 17 10 24 M17 3 C20 9 20 17 17 25" stroke="#B7323A" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M24 20 C28 22 29 25 31 24" stroke="#E5484D" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="9" cy="8" r="3" fill="#fff" opacity=".25"/></svg>';
+  var MOUSE = '<svg viewBox="0 0 40 24"><path d="M38 17 C34 21 31 15 27 19" stroke="#E7A8B4" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="17" cy="15" rx="14" ry="8" fill="#B9B4AE"/><circle cx="8" cy="8" r="4.5" fill="#CFCBC5"/><circle cx="8" cy="8" r="2.4" fill="#E7A8B4"/><circle cx="5" cy="14" r="1.4" fill="#2A2420"/><circle cx="2.4" cy="15.6" r="1.4" fill="#E7A8B4"/><circle cx="13" cy="21.5" r="2.4" fill="#6B6560"/><circle cx="25" cy="21.5" r="2.4" fill="#6B6560"/><path d="M19 8 L19 3 M16 3 L22 3" stroke="#E8846B" stroke-width="2" stroke-linecap="round"/></svg>';
   function setup() {
     cats.forEach(function (c) { c.el.parentNode && c.el.parentNode.removeChild(c.el); });
     cats = [];
-    var W = window.innerWidth, count = W < 520 ? 4 : W < 900 ? 5 : 6;
+    toys.forEach(function (t) { t.el.parentNode && t.el.parentNode.removeChild(t.el); }); toys = [];
+    var W = window.innerWidth, count = 6;
     for (var i = 0; i < count; i++) {
       var size = i === 4 ? 56 : 64 + (i % 3) * 5;
       var el = document.createElement("div");
-      el.className = "fc"; el.style.width = size + "px"; el.style.bottom = (4 + (i % 3) * 7) + "px"; el.style.zIndex = String(10 - (i % 3));
+      el.className = "fc"; el.style.width = size + "px"; c_bot = 4 + (i % 3) * 7; el.style.bottom = c_bot + "px"; el.style.zIndex = String(10 - (i % 3));
       el.innerHTML = glitchy(catSVG(ORDER[i % ORDER.length], "walking"));
       floor.appendChild(el); glitchLater(el.firstChild);
-      var c = { el: el, svg: el.querySelector(".cs"), size: size, x: (W - size) * (i + 0.5) / count, dir: i % 2 ? 1 : -1, speed: 22 + Math.random() * 30, state: "walk", until: 0 };
-      (function (c) { el.addEventListener("click", function () { pet(c.el, c.svg); c.state = "sit"; c.until = performance.now() + 2200; c.svg.className.baseVal = "cs sitting"; }); })(c);
+      var c = { el: el, svg: el.querySelector(".cs"), size: size, x: (W - size) * (i + 0.5) / count, dir: i % 2 ? 1 : -1, speed: 22 + Math.random() * 30, state: "walk", until: 0, bot: c_bot, y: 0, vx: 0, vy: 0, ang: 0, drag: null, perch: null, z: 10 - (i % 3) };
+      grab(c);
       cats.push(c);
     }
+    [["yarn", YARN, 26], ["mouse", MOUSE, 36]].forEach(function (d, k) {
+      var el = document.createElement("div"); el.className = "toy"; el.style.width = d[2] + "px"; el.innerHTML = d[1];
+      floor.appendChild(el);
+      var t = { el: el, kind: d[0], w: d[2], x: W * (0.2 + 0.5 * Math.random()) + k * 40, vx: 0, rot: 0, face: 1 };
+      el.addEventListener("click", function () { t.vx += (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 120); });
+      toys.push(t);
+    });
   }
+  function perchPos(c, b) {
+    var r = b.el.getBoundingClientRect(), h = c.el.offsetHeight;
+    if (r.top < 30 || r.bottom > window.innerHeight - 24 || r.right < 0 || r.left > window.innerWidth) return null;
+    return { x: r.left + r.width * b.fx - c.size / 2, y: r.top + 7 - h - (window.innerHeight - c.bot - h) };
+  }
+  function startJump(c, now) {
+    var cand = perches.filter(function (b) { return !b.taken && perchPos(c, b); });
+    if (!cand.length) return false;
+    var b = cand[Math.random() * cand.length | 0], q = perchPos(c, b);
+    b.taken = true; c.state = "jump"; c.jump = { t0: now, dur: 550 + Math.abs(q.y) * 0.9, x0: c.x, y0: c.y, b: b };
+    c.dir = q.x > c.x ? 1 : -1; look(c, "sit"); return true;
+  }
+  function leave(c) { if (c.perch) { c.perch.taken = false; c.perch = null; } }
   function look(c, st) { c.svg.className.baseVal = "cs " + ({ walk: "walking", sit: "sitting", sleep: "sleeping" }[st]); }
   function next(c, now) {
     var r = Math.random();
+    if (r < 0.1 && toys.length && c.y === 0) { c.state = "play"; c.toy = toys[Math.random() * toys.length | 0]; c.until = now + 4500 + Math.random() * 4000; c.hit = now + 700; return; }
+    if (r < 0.2 && c.y === 0 && startJump(c, now)) return;
+    r = Math.random();
     if (r < 0.55) { c.state = "walk"; c.dir = Math.random() < 0.5 ? -1 : 1; c.speed = 22 + Math.random() * 32; c.until = now + 3000 + Math.random() * 6000; }
     else if (r < 0.85) { c.state = "sit"; c.until = now + 2000 + Math.random() * 3500; }
     else { c.state = "sleep"; c.until = now + 5000 + Math.random() * 5000; }
     look(c, c.state);
   }
-  function place(c) { c.el.style.transform = "translateX(" + c.x.toFixed(1) + "px)"; c.svg.style.transform = "scaleX(" + c.dir + ")"; }
+  function place(c) {
+    c.el.style.transform = "translate(" + c.x.toFixed(1) + "px," + c.y.toFixed(1) + "px)";
+    c.svg.style.transform = (c.ang ? "rotate(" + c.ang.toFixed(1) + "deg) " : "") + "scaleX(" + c.dir + ")";
+  }
+
+  // pick a cat up (mouse or finger), hold it dangling, let go and it falls; a plain tap still pets it
+  function grab(c) {
+    var el = c.el;
+    el.addEventListener("pointerdown", function (e) {
+      if (e.button > 0) return;
+      try { el.setPointerCapture(e.pointerId); } catch (x) {}
+      var top = el.getBoundingClientRect().top - c.y;               // where the cat's feet rest on the floor
+      c.wasPerch = !!c.perch; c.drag = { sx: e.clientX, sy: e.clientY, gx: e.clientX - c.x, y0: c.y, rest: top, moved: false, t: performance.now(), lx: e.clientX };
+      c.state = "held"; c.vx = 0; c.vy = 0; el.style.cursor = "grabbing"; el.style.zIndex = "60";
+      look(c, "sit");
+      e.preventDefault();
+    });
+    el.addEventListener("pointermove", function (e) {
+      var d = c.drag; if (!d) return;
+      if (!d.moved && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 7) { d.moved = true; leave(c); c.svg.style.transformOrigin = "50% 6%"; look(c, "sit"); }
+      if (!d.moved) return;
+      var W = window.innerWidth, now = performance.now(), dt = Math.max(0.008, (now - d.t) / 1000);
+      var nx = Math.max(-4, Math.min(W - c.size + 4, e.clientX - d.gx));
+      c.vx = c.vx * 0.6 + ((nx - c.x) / dt) * 0.4; d.t = now;
+      c.x = nx;
+      c.y = Math.max(-d.rest + 4, Math.min(0, d.y0 + e.clientY - d.sy));
+    });
+    function drop(e) {
+      var d = c.drag; if (!d) return; c.drag = null;
+      el.style.cursor = ""; c.svg.style.transformOrigin = "";
+      if (!d.moved) { pet(c.el, c.svg); if (c.wasPerch) { c.state = "perch"; c.until = Math.max(c.until, performance.now() + 2500); } else { c.el.style.zIndex = String(c.z); c.state = "sit"; c.until = performance.now() + 2200; } look(c, "sit"); return; }
+      c.state = "fall"; c.vy = 0; c.vx = Math.max(-500, Math.min(500, c.vx)); c.bounced = false;
+    }
+    el.addEventListener("pointerup", drop);
+    el.addEventListener("pointercancel", drop);
+  }
 
   setup();
-  if (reduce) {
-    cats.forEach(function (c, i) { c.state = i % 2 ? "sleep" : "sit"; look(c, c.state); place(c); });
-  } else {
-    var last = performance.now();
-    cats.forEach(function (c) { c.until = last + Math.random() * 4000; });
-    (function frame(now) {
-      var dt = Math.min(0.1, (now - last) / 1000); last = now;
-      var W = window.innerWidth;
-      for (var i = 0; i < cats.length; i++) {
-        var c = cats[i];
+  if (reduce) cats.forEach(function (c, i) { c.state = i % 2 ? "sleep" : "sit"; look(c, c.state); place(c); });
+  var last = performance.now();
+  cats.forEach(function (c) { c.until = last + Math.random() * 4000; });
+  (function frame(now) {
+    var dt = Math.min(0.1, (now - last) / 1000); last = now;
+    var W = window.innerWidth;
+    for (var i = 0; i < cats.length; i++) {
+      var c = cats[i];
+      if (c.state === "held") {
+        if (c.drag && c.drag.moved) {                       // dangles from the scruff and swings with the hand
+          var target = Math.max(-28, Math.min(28, c.vx * 0.05)) + Math.sin(now / 170) * 5 * (c.y < -6 ? 1 : 0.2);
+          c.ang += (target - c.ang) * Math.min(1, dt * 9); c.vx *= 0.9;
+        }
+      } else if (c.state === "fall") {
+        c.vy += 1900 * dt; c.y += c.vy * dt; c.x += c.vx * dt; c.vx *= 0.995;
+        if (c.x < -4) { c.x = -4; c.vx = -c.vx * 0.5; }
+        if (c.x > W - c.size + 4) { c.x = W - c.size + 4; c.vx = -c.vx * 0.5; }
+        c.ang *= 0.9;
+        if (c.y >= 0) {
+          c.y = 0;
+          if (!c.bounced && c.vy > 350) { c.bounced = true; c.vy = -c.vy * 0.28; c.vx *= 0.5; }
+          else {
+            c.vy = 0; c.vx = 0; c.ang = 0; c.state = "sit"; c.until = now + 1400 + Math.random() * 1500; c.el.style.zIndex = String(c.z); look(c, "sit");
+            c.svg.classList.remove("hop"); void c.svg.getBoundingClientRect(); c.svg.classList.add("hop");
+            var g = c.svg.parentNode; if (g && g.classList && g.classList.contains("gl")) burst(g, 380);
+          }
+        }
+      } else if (c.state === "jump") {
+        var T = c.jump, pr = Math.min(1, (now - T.t0) / T.dur), q = perchPos(c, T.b);
+        if (!q) { T.b.taken = false; c.state = "fall"; c.vy = 0; c.vx = 0; c.bounced = false; }
+        else {
+          c.x = T.x0 + (q.x - T.x0) * pr; c.y = T.y0 + (q.y - T.y0) * pr - Math.sin(Math.PI * pr) * 70;
+          if (pr >= 1) { c.state = "perch"; c.perch = T.b; c.until = now + 7000 + Math.random() * 9000; look(c, Math.random() < 0.5 ? "sit" : "sleep"); c.dir = Math.random() < 0.5 ? -1 : 1; }
+        }
+      } else if (c.state === "perch") {
+        var q2 = perchPos(c, c.perch);
+        if (!q2 || now > c.until) { leave(c); c.state = "fall"; c.vx = (Math.random() < 0.5 ? -1 : 1) * 90; c.vy = -230; c.bounced = false; look(c, "sit"); }
+        else { c.x = q2.x; c.y = q2.y; }
+      } else if (c.state === "play" && !reduce) {
+        var t = c.toy, dx = t.x + t.w / 2 - (c.x + c.size / 2), sd = dx > 0 ? 1 : -1;
+        c.dir = sd;
+        if (Math.abs(dx) > 46) { c.x += sd * 75 * dt; look(c, "walk"); }
+        else {
+          look(c, "sit");
+          if (now > c.hit) { t.vx += sd * (170 + Math.random() * 190); c.svg.classList.remove("hop"); void c.svg.getBoundingClientRect(); c.svg.classList.add("hop"); c.hit = now + 600 + Math.random() * 600; }
+        }
+        c.x = Math.max(-4, Math.min(W - c.size + 4, c.x));
+        if (now > c.until) next(c, now);
+      } else if (!reduce) {
         if (c.state === "walk") {
           c.x += c.dir * c.speed * dt;
           if (c.x < -4) { c.x = -4; c.dir = 1; }
           if (c.x > W - c.size + 4) { c.x = W - c.size + 4; c.dir = -1; }
         }
         if (now > c.until) next(c, now);
-        place(c);
       }
-      requestAnimationFrame(frame);
-    })(last);
-  }
-  var rz; window.addEventListener("resize", function () { clearTimeout(rz); rz = setTimeout(function () { if (!reduce) { setup(); } }, 250); });
+      place(c);
+    }
+    toys.forEach(function (t) {
+      t.x += t.vx * dt; t.vx -= t.vx * 1.5 * dt;
+      if (t.x < 0) { t.x = 0; t.vx = -t.vx * 0.6; }
+      if (t.x > W - t.w) { t.x = W - t.w; t.vx = -t.vx * 0.6; }
+      var rot = 0, fl = "";
+      if (t.kind === "yarn") { t.rot += t.vx * dt * 4.4; rot = t.rot; }
+      else { if (Math.abs(t.vx) > 8) t.face = t.vx > 0 ? 1 : -1; rot = Math.abs(t.vx) > 20 ? Math.sin(now / 45) * 4 : 0; fl = " scaleX(" + t.face + ")"; }
+      t.el.style.transform = "translateX(" + t.x.toFixed(1) + "px) rotate(" + rot.toFixed(1) + "deg)" + fl;
+    });
+    requestAnimationFrame(frame);
+  })(last);
+  var rz; window.addEventListener("resize", function () { clearTimeout(rz); rz = setTimeout(function () { setup(); }, 250); });
 
   // ---------------------------------------------------------------- newest release from GitHub
   (function () {
