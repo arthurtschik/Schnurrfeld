@@ -8,7 +8,6 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -79,7 +78,8 @@ class UpdateShots {
         rule.onNodeWithText("Stuttgarter Str. 106", substring = true).assertExists()
         rule.onNode(isDialog()).captureRoboImage("$out/legal_impressum.png")
         rule.onNodeWithText("Schließen").performClick()
-        rule.onNodeWithText("Datenschutzerklärung").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Datenschutzerklärung").performScrollTo().performClick()
         rule.waitForIdle()
         rule.onNode(isDialog()).captureRoboImage("$out/legal_datenschutz.png")
     }

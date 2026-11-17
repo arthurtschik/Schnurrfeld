@@ -120,6 +120,8 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 }
             }
 
+            LegalSection()
+
             ChangelogSection()
 
             SectionTitle("App")
@@ -145,8 +147,6 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                     }
                 }
             }
-
-            LegalSection()
 
             SectionTitle("Fortschritt")
             SectionCard {
