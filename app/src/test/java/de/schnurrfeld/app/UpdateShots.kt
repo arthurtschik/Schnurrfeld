@@ -8,6 +8,7 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -64,5 +65,22 @@ class UpdateShots {
         rule.onNodeWithTag("changelog_1.4").performScrollTo()
         rule.waitForIdle()
         rule.onRoot().captureRoboImage("$out/changelog_b.png")
+    }
+
+    @Test fun legal() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val app = App(Store(ctx), SoundManager(ctx), VoiceManager(ctx), LevelBank { File("src/main/assets/levels.txt").inputStream() })
+        rule.setContent { SchnurrTheme(false) { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { SettingsScreen(app, {}) } } }
+        rule.onNodeWithText("Impressum").performScrollTo()
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("$out/legal_settings.png")
+        rule.onNodeWithText("Impressum").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Stuttgarter Str. 106", substring = true).assertExists()
+        rule.onNode(isDialog()).captureRoboImage("$out/legal_impressum.png")
+        rule.onNodeWithText("Schließen").performClick()
+        rule.onNodeWithText("Datenschutzerklärung").performClick()
+        rule.waitForIdle()
+        rule.onNode(isDialog()).captureRoboImage("$out/legal_datenschutz.png")
     }
 }

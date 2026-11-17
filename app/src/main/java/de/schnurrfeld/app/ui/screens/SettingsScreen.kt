@@ -12,6 +12,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Gavel
+import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -52,6 +55,7 @@ import de.schnurrfeld.app.data.Updater
 import kotlinx.coroutines.launch
 import de.schnurrfeld.app.data.ThemeMode
 import de.schnurrfeld.app.ui.components.Gap
+import de.schnurrfeld.app.data.LegalTexts
 import de.schnurrfeld.app.ui.components.HGap
 import de.schnurrfeld.app.ui.components.SectionCard
 import de.schnurrfeld.app.ui.components.SectionTitle
@@ -142,6 +146,8 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 }
             }
 
+            LegalSection()
+
             SectionTitle("Fortschritt")
             SectionCard {
                 NavRow(Icons.Rounded.DeleteOutline, "Fortschritt zurücksetzen", "Levels, Sterne, Katzen und Joker") { confirmReset = true }
@@ -208,6 +214,35 @@ private fun ChangelogSection() {
                 }
             }
         }
+    }
+}
+
+/** Impressum, Datenschutz und Nutzungsbedingungen: ein Tipp auf die Zeile öffnet den Text */
+@Composable
+private fun LegalSection() {
+    var doc by remember { mutableStateOf<LegalTexts.Doc?>(null) }
+    SectionTitle("Rechtliches")
+    SectionCard {
+        NavRow(Icons.Rounded.Gavel, "Impressum", "Wer hinter Schnurrfeld steckt") { doc = LegalTexts.impressum }
+        Divider()
+        NavRow(Icons.Rounded.PrivacyTip, "Datenschutzerklärung", "Welche Daten die App nutzt") { doc = LegalTexts.datenschutz }
+        Divider()
+        NavRow(Icons.Rounded.Description, "Nutzungsbedingungen", "Die Spielregeln drumherum") { doc = LegalTexts.nutzung }
+    }
+    doc?.let { d ->
+        AlertDialog(
+            onDismissRequest = { doc = null },
+            title = { Text(d.title) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    d.blocks.forEach { b ->
+                        Text(b.heading, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+                        Text(b.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { doc = null }) { Text("Schließen") } },
+        )
     }
 }
 

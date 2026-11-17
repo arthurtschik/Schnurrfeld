@@ -42,6 +42,7 @@ object Changelog {
                     "Beschädigte Spieldaten bringen die App nicht mehr zum Absturz",
                     "Entfernt: die Aufnahme und der Import eigener Lob-Stimmen. Die App braucht dadurch keine Mikrofon-Berechtigung mehr",
                     "Neu in den Einstellungen: der Bereich \"Was ist neu\"",
+                    "Neu in den Einstellungen: Impressum, Datenschutzerklärung und Nutzungsbedingungen",
                 )),
             ),
         ),
